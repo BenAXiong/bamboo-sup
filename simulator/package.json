@@ -1,0 +1,22 @@
+{
+  "name": "bamboo-sup-simulator",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Hydrostatics and geometry for the bamboo SUP. Physics is headless and must not import Three.js.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "report": "vite-node scripts/report.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.3"
+  }
+}

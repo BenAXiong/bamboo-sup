@@ -2,10 +2,10 @@
 
 ## Immediate
 
-- [ ] Freeze V0 input/output contract.
+- [x] Freeze V0 input/output contract.
 - [x] Define the canonical `design.json` schema. See `docs/engineering/design-contract.md`.
-- [ ] Implement circular-segment buoyancy and longitudinal integration.
-- [ ] Add equilibrium draft solver and hand-calculation regression cases.
+- [x] Implement circular-segment buoyancy and longitudinal integration.
+- [x] Add equilibrium draft solver and hand-calculation regression cases.
 - [ ] Generate a simple parametric culm mesh in Three.js.
 - [ ] Add water plane and live draft/freeboard readout.
 - [ ] Add side/top/front SVG technical views.
