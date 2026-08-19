@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BenAXiong/bamboo-sup/schema/conditions.schema.json",
+  "title": "Bamboo SUP load case",
+  "description": "A scenario applied to a design: water, gravity, and the masses the object is asked to carry. Kept separate from design.json so a built prototype's design stays byte-stable across many test conditions. Same frame as the design it references.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "condition_id", "design_ref", "units", "water", "loads"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "condition_id": { "type": "string", "description": "Identifier for this load case, e.g. C-rider-centred." },
+    "design_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["design_id"],
+      "properties": {
+        "design_id": { "type": "string", "pattern": "^SUP-[0-9]{3}[a-z]?$" },
+        "path": { "type": "string", "description": "Optional path to the design file, relative to repository root." }
+      }
+    },
+    "name": { "type": "string" },
+    "notes": { "type": "string" },
+
+    "units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["length", "mass", "angle"],
+      "properties": {
+        "length": { "const": "mm" },
+        "mass": { "const": "kg" },
+        "angle": { "const": "deg" }
+      }
+    },
+
+    "water": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["density_kg_m3"],
+      "properties": {
+        "density_kg_m3": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "998 fresh at 20 C, 1025 typical seawater. Fresh is the conservative early workshop assumption."
+        },
+        "label": { "enum": ["fresh", "brackish", "seawater", "other"] },
+        "surface": {
+          "const": "calm_plane",
+          "description": "Only calm water is modelled. Wave cases require a schema revision, not a fudged value here."
+        }
+      }
+    },
+
+    "gravity_m_s2": { "type": "number", "exclusiveMinimum": 0, "default": 9.80665 },
+
+    "loads": {
+      "type": "array",
+      "description": "Everything carried but not permanently part of the object. An empty array is a valid unloaded case.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "mass_kg", "position"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "enum": ["rider", "ballast", "gear", "paddle", "other"] },
+          "mass_kg": { "type": "number", "minimum": 0 },
+          "position": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x_mm", "y_mm", "z_mm"],
+            "description": "Centre of mass in the design frame. For a rider this is the standing CG, well above the deck.",
+            "properties": {
+              "x_mm": { "type": "number" },
+              "y_mm": { "type": "number" },
+              "z_mm": { "type": "number" }
+            }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+
+    "solve": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Which equilibrium degrees of freedom the solver is permitted to move. V0 solves heave only; heel and trim arrive in V2.",
+      "properties": {
+        "dof": {
+          "type": "array",
+          "items": { "enum": ["heave", "heel", "trim"] },
+          "uniqueItems": true,
+          "default": ["heave"]
+        },
+        "tolerance_n": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Residual force tolerance for equilibrium, in newtons."
+        },
+        "max_iterations": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "expectations": {
+      "type": "array",
+      "description": "Optional hand-calculated or previously measured values this case is checked against. This is how a regression case or a prototype measurement is attached to a scenario without hiding a fudge factor in code.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["quantity", "value", "source"],
+        "properties": {
+          "quantity": {
+            "enum": [
+              "displaced_volume_m3",
+              "draft_mm",
+              "min_freeboard_mm",
+              "reserve_buoyancy_fraction",
+              "heel_deg",
+              "trim_deg",
+              "total_mass_kg"
+            ]
+          },
+          "value": { "type": "number" },
+          "tolerance": { "type": "number", "minimum": 0 },
+          "source": {
+            "enum": ["hand_calculation", "measurement", "prior_model"],
+            "description": "measurement values are facts and must never be edited to match the model."
+          },
+          "reference": { "type": "string", "description": "Test log, protocol or derivation this came from." }
+        }
+      }
+    }
+  }
+}

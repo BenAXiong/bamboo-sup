@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "design_id": "SUP-001",
+  "name": "V0 idealised six-culm baseline",
+  "created_utc": "2026-08-19T00:00:00Z",
+  "derived_from": null,
+  "notes": "Placeholder geometry for exercising the V0 hydrostatic model. Every culm here is a synthetic tapered cylinder; none of these numbers came from the workshop. Replace with source=inventory culms as soon as data/culms/inventory.csv has real entries.",
+
+  "units": { "length": "mm", "mass": "kg", "angle": "deg" },
+
+  "bow": {
+    "curve_start_from_bow_mm": 900,
+    "tip_rise_mm": 350,
+    "shape": "power",
+    "exponent": 2.0
+  },
+
+  "culms": [
+    {
+      "id": "M1",
+      "source": "parametric",
+      "length_mm": 3200,
+      "mass_kg": 3.5,
+      "diameter_base_mm": 120,
+      "diameter_tip_mm": 90,
+      "orientation": "base_aft",
+      "placement": { "x_tail_mm": 0, "y_tail_mm": 325, "y_bow_mm": 276.3, "z_mm": 60, "roll_deg": 0 },
+      "chambers": { "sealed": true, "flooded_fraction": 0, "open_ends": 0 }
+    },
+    {
+      "id": "M2",
+      "source": "parametric",
+      "length_mm": 3200,
+      "mass_kg": 3.5,
+      "diameter_base_mm": 120,
+      "diameter_tip_mm": 90,
+      "orientation": "base_forward",
+      "placement": { "x_tail_mm": 0, "y_tail_mm": 195, "y_bow_mm": 165.8, "z_mm": 60, "roll_deg": 0 },
+      "chambers": { "sealed": true, "flooded_fraction": 0, "open_ends": 0 }
+    },
+    {
+      "id": "M3",
+      "source": "parametric",
+      "length_mm": 3200,
+      "mass_kg": 3.5,
+      "diameter_base_mm": 120,
+      "diameter_tip_mm": 90,
+      "orientation": "base_aft",
+      "placement": { "x_tail_mm": 0, "y_tail_mm": 65, "y_bow_mm": 55.3, "z_mm": 60, "roll_deg": 0 },
+      "chambers": { "sealed": true, "flooded_fraction": 0, "open_ends": 0 }
+    },
+    {
+      "id": "M4",
+      "source": "parametric",
+      "length_mm": 3200,
+      "mass_kg": 3.5,
+      "diameter_base_mm": 120,
+      "diameter_tip_mm": 90,
+      "orientation": "base_forward",
+      "placement": { "x_tail_mm": 0, "y_tail_mm": -65, "y_bow_mm": -55.3, "z_mm": 60, "roll_deg": 0 },
+      "chambers": { "sealed": true, "flooded_fraction": 0, "open_ends": 0 }
+    },
+    {
+      "id": "M5",
+      "source": "parametric",
+      "length_mm": 3200,
+      "mass_kg": 3.5,
+      "diameter_base_mm": 120,
+      "diameter_tip_mm": 90,
+      "orientation": "base_aft",
+      "placement": { "x_tail_mm": 0, "y_tail_mm": -195, "y_bow_mm": -165.8, "z_mm": 60, "roll_deg": 0 },
+      "chambers": { "sealed": true, "flooded_fraction": 0, "open_ends": 0 }
+    },
+    {
+      "id": "M6",
+      "source": "parametric",
+      "length_mm": 3200,
+      "mass_kg": 3.5,
+      "diameter_base_mm": 120,
+      "diameter_tip_mm": 90,
+      "orientation": "base_forward",
+      "placement": { "x_tail_mm": 0, "y_tail_mm": -325, "y_bow_mm": -276.3, "z_mm": 60, "roll_deg": 0 },
+      "chambers": { "sealed": true, "flooded_fraction": 0, "open_ends": 0 }
+    }
+  ],
+
+  "cross_members": [
+    { "id": "X1", "x_mm": 500, "mass_kg": 0.4, "diameter_mm": 45, "length_mm": 800, "side": "over" },
+    { "id": "X2", "x_mm": 1600, "mass_kg": 0.4, "diameter_mm": 45, "length_mm": 780, "side": "over" },
+    { "id": "X3", "x_mm": 2500, "mass_kg": 0.4, "diameter_mm": 45, "length_mm": 720, "side": "over" }
+  ],
+
+  "lashings": [
+    { "id": "L1", "material": "rattan", "x_mm": 500, "mass_kg": 0.1 },
+    { "id": "L2", "material": "rattan", "x_mm": 1600, "mass_kg": 0.1 },
+    { "id": "L3", "material": "rattan", "x_mm": 2500, "mass_kg": 0.1 }
+  ],
+
+  "layout_intent": {
+    "rule": "uniform_pitch",
+    "target_gap_tail_mm": 10,
+    "target_gap_bow_mm": 6,
+    "convergence_ratio": 0.85,
+    "notes": "130 mm pitch on 120 mm butts, so roughly 10 mm clear at the tail closing toward the bow. Culms alternate base_aft / base_forward; both the gap and the alternation are open variables, not settled construction."
+  }
+}

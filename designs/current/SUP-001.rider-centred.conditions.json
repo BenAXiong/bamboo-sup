@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "condition_id": "C-rider-centred",
+  "name": "80 kg rider, centred, fresh water",
+  "design_ref": { "design_id": "SUP-001", "path": "designs/current/SUP-001.design.json" },
+  "notes": "Provisional default load case from DESIGN_TARGETS.md. Rider CG height is a guess and should be measured before it influences any V2 stability conclusion.",
+
+  "units": { "length": "mm", "mass": "kg", "angle": "deg" },
+
+  "water": { "density_kg_m3": 998.2, "label": "fresh", "surface": "calm_plane" },
+  "gravity_m_s2": 9.80665,
+
+  "loads": [
+    {
+      "id": "rider",
+      "kind": "rider",
+      "mass_kg": 80,
+      "position": { "x_mm": 1600, "y_mm": 0, "z_mm": 1050 },
+      "notes": "Standing CG assumed roughly 1 m above the culm axes. Replace with a measured value."
+    }
+  ],
+
+  "solve": { "dof": ["heave"], "tolerance_n": 0.5, "max_iterations": 100 }
+}
