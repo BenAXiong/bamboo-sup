@@ -5,7 +5,7 @@ Currently implemented: the headless half — schemas, geometry and hydrostatics.
 
 ```
 npm install
-npm test          # 46 hand-calculation and regression cases
+npm test          # 69 hand-calculation and regression cases
 npm run typecheck
 npm run report -- ../designs/current/SUP-001.design.json \
                   ../designs/current/SUP-001.rider-centred.conditions.json
@@ -23,31 +23,52 @@ npm run report -- ../designs/current/SUP-001.design.json \
 
 Physics must not import Three.js.
 
-## What V0 computes
+## What it computes
 
-`solveEquilibrium(design, conditions)` returns displaced volume, equilibrium
-draft, minimum freeboard and where along the hull it occurs, reserve buoyancy,
-per-culm displacement, and the force residual left at convergence.
+`solveEquilibrium(design, conditions)` returns the solved attitude, displaced
+volume, draft, the lowest freeboard on the bundle and which culm carries it,
+bow reserve, reserve buoyancy, centres of gravity and buoyancy, per-culm
+displacement, and the residuals left at convergence. `rightingArmCurve` sweeps
+heel to give the stability curve, its peak, the angle of vanishing stability and
+the heel at which the deck goes under.
 
-Two modelling choices carry the weight:
+Degrees of freedom come from the load case: `solve.dof` may free `heave`,
+`heel` and `trim`. Heave is always required.
+
+Three modelling choices carry the weight:
 
 - **Culms are parameterised by arc length.** Bending the bow up consumes
   material and shortens horizontal extent; it never stretches the culm. A
   regression case asserts that a bent culm still measures its full length.
-- **Vertical sections through an inclined tube are ellipses**, with semi-axes
-  `r` and `r/cos(theta)`. Submerged area comes from the circular-segment formula
-  scaled vertically, which is exact. A regression case asserts that bending a
-  culm leaves its fully submerged volume at `pi r^2 L`.
+- **Sections are cut perpendicular to the culm axis**, so the submerged area
+  depends on one number regardless of how the boat is oriented. A regression
+  case asserts that bending a culm leaves its submerged volume at `pi r^2 L`,
+  and the method was checked against a Monte Carlo integration of an inclined
+  cylinder.
+- **The body rotates and the water stays flat.** A station's depth is always its
+  world z against the waterline, in every attitude.
 
-Equilibrium is found by bisection on waterline height. Displaced volume rises
-monotonically with the waterline, so bisection cannot diverge and stays
-well-behaved where a culm is fully submerged and the curve goes flat.
+Heave is solved by bisection, which cannot diverge given monotone displacement.
+Heel and trim are solved outside it by damped Newton on the horizontal offset
+between the centres of buoyancy and gravity, with the step capped so a barely
+stable boat does not converge on a distant equilibrium.
 
-## What V0 does not do
+## What it refuses to do
 
-- Heel and trim: `solve.dof` rejects anything but `heave` rather than ignoring it.
-- Inventory-sourced culms: `buildCulmGeometry` refuses them until V1 resolves
-  measured geometry from `data/culms/inventory.csv`.
+- **Invent an attitude that does not exist.** A bundle can run out of righting
+  moment once the windward culm lifts clear; past that the solver returns
+  `converged: false` rather than the least-bad angle it tried.
+- **Fabricate a waterline** for a design that sinks: `floats: false` instead.
+- **Guess at measured culms.** `buildCulmGeometry` refuses `source: inventory`
+  until V1 resolves geometry from `data/culms/inventory.csv`.
 - Waves, drag, structure. `water.surface` is pinned to `calm_plane`.
 - Flooding is modelled as a uniform fraction of a culm's bore, not as a water
   level inside it.
+
+## Assumptions worth knowing
+
+Mass positions that were not stated are assumed, and `massProperties.ts` labels
+each one: culm mass is distributed along the length in proportion to local
+diameter (constant wall thickness), cross-members sit on the bundle crown, and
+lashings wrap the bundle at axis height. Rider CG height comes from the load
+case and dominates every stability result.

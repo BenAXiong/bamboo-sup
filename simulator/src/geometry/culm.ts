@@ -18,6 +18,7 @@
  */
 
 import type { BowCurve, Culm, Design } from "../model/types.js";
+import { normalise, type Vec3 } from "../physics/attitude.js";
 
 export interface Station {
   /** Arc length from the culm's aft end, mm. */
@@ -36,6 +37,8 @@ export interface Station {
   a_mm: number;
   /** Vertical semi-axis of the vertical-plane section: r / cos(theta). */
   b_mm: number;
+  /** Unit tangent of the centreline, pointing forward. Needed to cut sections against a tilted waterline. */
+  tangent: Vec3;
 }
 
 export interface CulmGeometry {
@@ -265,6 +268,7 @@ export function buildCulmGeometry(
       slope,
       a_mm: r,
       b_mm: b,
+      tangent: { x: 0, y: 0, z: 0 }, // filled below, once neighbours are known
     });
     zMin = Math.min(zMin, z - b);
     zMax = Math.max(zMax, z + b);
@@ -276,6 +280,18 @@ export function buildCulmGeometry(
   for (const st of stations) {
     const t = span > 0 ? (st.x_mm - first.x_mm) / span : 0;
     st.y_mm = culm.placement.y_tail_mm + t * (culm.placement.y_bow_mm - culm.placement.y_tail_mm);
+  }
+
+  // Tangents come from neighbouring stations, so splay in y is included rather
+  // than being dropped by treating the culm as lying in the x-z plane.
+  for (let i = 0; i < stations.length; i++) {
+    const prev = stations[Math.max(0, i - 1)] as Station;
+    const next = stations[Math.min(stations.length - 1, i + 1)] as Station;
+    (stations[i] as Station).tangent = normalise({
+      x: next.x_mm - prev.x_mm,
+      y: next.y_mm - prev.y_mm,
+      z: next.z_mm - prev.z_mm,
+    });
   }
 
   return {

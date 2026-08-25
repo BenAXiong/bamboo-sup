@@ -5,133 +5,257 @@
   "description": "The physical object only. Rider, ballast and water belong in a conditions file. Frame: x longitudinal, 0 at tail, positive toward bow; y transverse, 0 at centreline, positive to port; z vertical, 0 at the lowest point of the unloaded assembly, positive up.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "design_id", "units", "bow", "culms"],
+  "required": [
+    "schema_version",
+    "design_id",
+    "units",
+    "bow",
+    "culms"
+  ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": {
+      "const": 1
+    },
     "design_id": {
       "type": "string",
       "pattern": "^SUP-[0-9]{3}[a-z]?$",
       "description": "Permanent identifier, e.g. SUP-001. Suffix letter for minor revisions."
     },
-    "name": { "type": "string" },
-    "created_utc": { "type": "string", "format": "date-time" },
+    "name": {
+      "type": "string"
+    },
+    "created_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
     "derived_from": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "design_id this was branched from, for traceability."
     },
-    "notes": { "type": "string" },
-
+    "notes": {
+      "type": "string"
+    },
     "units": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["length", "mass", "angle"],
+      "required": [
+        "length",
+        "mass",
+        "angle"
+      ],
       "description": "Declared explicitly so no consumer has to assume. Keys elsewhere carry unit suffixes to match.",
       "properties": {
-        "length": { "const": "mm" },
-        "mass": { "const": "kg" },
-        "angle": { "const": "deg" }
+        "length": {
+          "const": "mm"
+        },
+        "mass": {
+          "const": "kg"
+        },
+        "angle": {
+          "const": "deg"
+        }
       }
     },
-
-    "bow": { "$ref": "#/$defs/bow_curve" },
-
+    "bow": {
+      "$ref": "#/$defs/bow_curve"
+    },
     "culms": {
       "type": "array",
       "minItems": 1,
       "description": "Main load-bearing culms. Array order is not significant; placement is absolute.",
-      "items": { "$ref": "#/$defs/culm" }
+      "items": {
+        "$ref": "#/$defs/culm"
+      }
     },
-
     "cross_members": {
       "type": "array",
       "description": "Transverse bamboo holding bundle geometry. V0 uses them for mass and trim only.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "x_mm", "mass_kg"],
+        "required": [
+          "id",
+          "x_mm",
+          "mass_kg"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "x_mm": { "type": "number" },
-          "mass_kg": { "type": "number", "minimum": 0 },
-          "diameter_mm": { "type": "number", "exclusiveMinimum": 0 },
-          "length_mm": { "type": "number", "exclusiveMinimum": 0 },
-          "side": { "enum": ["over", "under", "both"], "description": "Which face of the bundle it lashes to." },
-          "notes": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "x_mm": {
+            "type": "number"
+          },
+          "mass_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "diameter_mm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "length_mm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "side": {
+            "enum": [
+              "over",
+              "under",
+              "both"
+            ],
+            "description": "Which face of the bundle it lashes to."
+          },
+          "notes": {
+            "type": "string"
+          },
+          "y_mm": {
+            "type": "number",
+            "description": "Transverse centre of mass. Defaults to the centreline when omitted."
+          },
+          "z_mm": {
+            "type": "number",
+            "description": "Height of the centre of mass. Defaults to the bundle crown at this station when omitted."
+          }
         }
       }
     },
-
     "lashings": {
       "type": "array",
       "description": "Vine/rattan bindings. Mass and location only until a slip/creep model exists.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "mass_kg"],
+        "required": [
+          "id",
+          "mass_kg"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "material": { "enum": ["rattan", "vine", "cord", "other"] },
-          "x_mm": { "type": "number" },
-          "mass_kg": { "type": "number", "minimum": 0 },
-          "notes": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "material": {
+            "enum": [
+              "rattan",
+              "vine",
+              "cord",
+              "other"
+            ]
+          },
+          "x_mm": {
+            "type": "number"
+          },
+          "mass_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          },
+          "y_mm": {
+            "type": "number",
+            "description": "Transverse centre of mass. Defaults to the centreline when omitted."
+          },
+          "z_mm": {
+            "type": "number",
+            "description": "Height of the centre of mass. Defaults to the bundle axis height at this station when omitted."
+          }
         }
       }
     },
-
     "additional_masses": {
       "type": "array",
       "description": "Anything else permanently part of the built object: deck mat, fittings, test hardware.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "mass_kg", "position"],
+        "required": [
+          "id",
+          "mass_kg",
+          "position"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "mass_kg": { "type": "number", "minimum": 0 },
-          "position": { "$ref": "#/$defs/point3" },
+          "id": {
+            "type": "string"
+          },
+          "mass_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "position": {
+            "$ref": "#/$defs/point3"
+          },
           "buoyant": {
             "type": "boolean",
             "default": false,
             "description": "True only if this item displaces water when submerged and that volume is modelled."
           },
-          "notes": { "type": "string" }
+          "notes": {
+            "type": "string"
+          }
         }
       }
     },
-
     "layout_intent": {
       "type": "object",
       "additionalProperties": false,
       "description": "Non-authoritative record of the rule that generated culm placements. Placements remain the source of truth; actual gaps are derived from real diameters.",
       "properties": {
-        "rule": { "enum": ["uniform_gap", "uniform_pitch", "manual", "optimiser"] },
-        "target_gap_tail_mm": { "type": "number" },
-        "target_gap_bow_mm": { "type": "number" },
+        "rule": {
+          "enum": [
+            "uniform_gap",
+            "uniform_pitch",
+            "manual",
+            "optimiser"
+          ]
+        },
+        "target_gap_tail_mm": {
+          "type": "number"
+        },
+        "target_gap_bow_mm": {
+          "type": "number"
+        },
         "convergence_ratio": {
           "type": "number",
           "description": "Bow lateral offsets as a fraction of tail offsets. 1.0 is parallel."
         },
-        "notes": { "type": "string" }
+        "notes": {
+          "type": "string"
+        }
       }
     }
   },
-
   "$defs": {
     "point3": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["x_mm", "y_mm", "z_mm"],
+      "required": [
+        "x_mm",
+        "y_mm",
+        "z_mm"
+      ],
       "properties": {
-        "x_mm": { "type": "number" },
-        "y_mm": { "type": "number" },
-        "z_mm": { "type": "number" }
+        "x_mm": {
+          "type": "number"
+        },
+        "y_mm": {
+          "type": "number"
+        },
+        "z_mm": {
+          "type": "number"
+        }
       }
     },
-
     "bow_curve": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["curve_start_from_bow_mm", "tip_rise_mm", "shape"],
+      "required": [
+        "curve_start_from_bow_mm",
+        "tip_rise_mm",
+        "shape"
+      ],
       "description": "Recurve applied to a culm centreline. Given at design level as the bundle default; a culm may override it.",
       "properties": {
         "curve_start_from_bow_mm": {
@@ -145,7 +269,10 @@
           "description": "Vertical rise of the culm tip above the straight run."
         },
         "shape": {
-          "enum": ["power", "circular_arc"],
+          "enum": [
+            "power",
+            "circular_arc"
+          ],
           "description": "power: z = tip_rise * (s / curve_start_from_bow_mm)^exponent. circular_arc: constant-radius transition, tangent to the straight run."
         },
         "exponent": {
@@ -154,49 +281,97 @@
           "description": "Only meaningful for shape=power. 2 is a smooth quadratic sweep; higher values concentrate curvature near the tip."
         }
       },
-      "if": { "properties": { "shape": { "const": "power" } }, "required": ["shape"] },
-      "then": { "required": ["exponent"] }
+      "if": {
+        "properties": {
+          "shape": {
+            "const": "power"
+          }
+        },
+        "required": [
+          "shape"
+        ]
+      },
+      "then": {
+        "required": [
+          "exponent"
+        ]
+      }
     },
-
     "culm": {
       "type": "object",
-      "required": ["id", "source", "orientation", "placement", "chambers"],
+      "required": [
+        "id",
+        "source",
+        "orientation",
+        "placement",
+        "chambers"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "description": "Position identifier within this design, e.g. M1." },
+        "id": {
+          "type": "string",
+          "description": "Position identifier within this design, e.g. M1."
+        },
         "source": {
-          "enum": ["parametric", "inventory"],
+          "enum": [
+            "parametric",
+            "inventory"
+          ],
           "description": "parametric: idealised culm defined inline (V0). inventory: resolved against data/culms/inventory.csv (V1)."
         },
         "culm_id": {
           "type": "string",
           "description": "Required when source=inventory. Must match a culm_id in the inventory CSV."
         },
-        "length_mm": { "type": "number", "exclusiveMinimum": 0 },
-        "mass_kg": { "type": "number", "exclusiveMinimum": 0 },
-        "diameter_base_mm": { "type": "number", "exclusiveMinimum": 0 },
+        "length_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mass_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "diameter_base_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "diameter_tip_mm": {
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Equal to diameter_base_mm for a cylindrical V0 culm; smaller for linear taper."
         },
         "orientation": {
-          "enum": ["base_forward", "base_aft"],
+          "enum": [
+            "base_forward",
+            "base_aft"
+          ],
           "description": "Which end of the culm points at the bow. A design variable to be tested, not a fixed convention."
         },
         "placement": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["x_tail_mm", "y_tail_mm", "y_bow_mm", "z_mm"],
+          "required": [
+            "x_tail_mm",
+            "y_tail_mm",
+            "y_bow_mm",
+            "z_mm"
+          ],
           "description": "Culms are never exactly parallel: separate tail and bow lateral offsets express splay or convergence. Gaps between neighbours are derived from these plus real diameters, never stated directly.",
           "properties": {
             "x_tail_mm": {
               "type": "number",
               "description": "Longitudinal position of the culm's aft end. Non-zero values stagger culms of differing length."
             },
-            "y_tail_mm": { "type": "number" },
-            "y_bow_mm": { "type": "number" },
-            "z_mm": { "type": "number", "description": "Height of the culm axis above the frame origin." },
+            "y_tail_mm": {
+              "type": "number"
+            },
+            "y_bow_mm": {
+              "type": "number"
+            },
+            "z_mm": {
+              "type": "number",
+              "description": "Height of the culm axis above the frame origin."
+            },
             "roll_deg": {
               "type": "number",
               "default": 0,
@@ -207,10 +382,14 @@
         "chambers": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["sealed"],
+          "required": [
+            "sealed"
+          ],
           "description": "Buoyancy state. A sealed culm displaces its full outside volume; a flooded one displaces only its wall.",
           "properties": {
-            "sealed": { "type": "boolean" },
+            "sealed": {
+              "type": "boolean"
+            },
             "flooded_fraction": {
               "type": "number",
               "minimum": 0,
@@ -218,7 +397,12 @@
               "default": 0,
               "description": "Fraction of internal volume occupied by water. Baseline 0; raised for damaged-culm scenarios."
             },
-            "open_ends": { "type": "integer", "minimum": 0, "maximum": 2, "default": 0 },
+            "open_ends": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2,
+              "default": 0
+            },
             "wall_thickness_mm": {
               "type": "number",
               "exclusiveMinimum": 0,
@@ -226,27 +410,76 @@
             }
           }
         },
-        "bow_override": { "$ref": "#/$defs/bow_curve" },
-        "notes": { "type": "string" }
+        "bow_override": {
+          "$ref": "#/$defs/bow_curve"
+        },
+        "notes": {
+          "type": "string"
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "source": { "const": "parametric" } }, "required": ["source"] },
+          "if": {
+            "properties": {
+              "source": {
+                "const": "parametric"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
           "then": {
-            "required": ["length_mm", "mass_kg", "diameter_base_mm", "diameter_tip_mm"],
-            "not": { "required": ["culm_id"] }
+            "required": [
+              "length_mm",
+              "mass_kg",
+              "diameter_base_mm",
+              "diameter_tip_mm"
+            ],
+            "not": {
+              "required": [
+                "culm_id"
+              ]
+            }
           }
         },
         {
-          "if": { "properties": { "source": { "const": "inventory" } }, "required": ["source"] },
+          "if": {
+            "properties": {
+              "source": {
+                "const": "inventory"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
           "then": {
-            "required": ["culm_id"],
+            "required": [
+              "culm_id"
+            ],
             "not": {
               "anyOf": [
-                { "required": ["length_mm"] },
-                { "required": ["mass_kg"] },
-                { "required": ["diameter_base_mm"] },
-                { "required": ["diameter_tip_mm"] }
+                {
+                  "required": [
+                    "length_mm"
+                  ]
+                },
+                {
+                  "required": [
+                    "mass_kg"
+                  ]
+                },
+                {
+                  "required": [
+                    "diameter_base_mm"
+                  ]
+                },
+                {
+                  "required": [
+                    "diameter_tip_mm"
+                  ]
+                }
               ]
             }
           }
@@ -255,13 +488,29 @@
           "if": {
             "properties": {
               "chambers": {
-                "properties": { "flooded_fraction": { "exclusiveMinimum": 0 } },
-                "required": ["flooded_fraction"]
+                "properties": {
+                  "flooded_fraction": {
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "flooded_fraction"
+                ]
               }
             },
-            "required": ["chambers"]
+            "required": [
+              "chambers"
+            ]
           },
-          "then": { "properties": { "chambers": { "required": ["wall_thickness_mm"] } } }
+          "then": {
+            "properties": {
+              "chambers": {
+                "required": [
+                  "wall_thickness_mm"
+                ]
+              }
+            }
+          }
         }
       ]
     }

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "condition_id": "C-rider-offset",
+  "name": "80 kg rider standing 100 mm off centre, fresh water",
+  "design_ref": { "design_id": "SUP-001", "path": "designs/current/SUP-001.design.json" },
+  "notes": "The standing-stability case: heel and trim are both free, so the board finds its own attitude rather than being assumed upright. 100 mm is a small weight shift, not a lunge. Rider CG height is still a guess and dominates this result, so measure it before drawing conclusions.",
+
+  "units": { "length": "mm", "mass": "kg", "angle": "deg" },
+
+  "water": { "density_kg_m3": 998.2, "label": "fresh", "surface": "calm_plane" },
+  "gravity_m_s2": 9.80665,
+
+  "loads": [
+    {
+      "id": "rider",
+      "kind": "rider",
+      "mass_kg": 80,
+      "position": { "x_mm": 1600, "y_mm": -100, "z_mm": 1050 },
+      "notes": "Standing CG assumed roughly 1 m above the culm axes, displaced to starboard."
+    }
+  ],
+
+  "solve": { "dof": ["heave", "heel", "trim"], "tolerance_n": 0.5, "max_iterations": 200 }
+}

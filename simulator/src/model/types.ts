@@ -57,6 +57,10 @@ export interface Culm {
 export interface CrossMember {
   id: string;
   x_mm: number;
+  /** Defaults to the centreline when omitted. */
+  y_mm?: number;
+  /** Defaults to the bundle crown at this station when omitted. */
+  z_mm?: number;
   mass_kg: number;
   diameter_mm?: number;
   length_mm?: number;
@@ -68,6 +72,10 @@ export interface Lashing {
   id: string;
   material?: "rattan" | "vine" | "cord" | "other";
   x_mm?: number;
+  /** Defaults to the centreline when omitted. */
+  y_mm?: number;
+  /** Defaults to the bundle axis height at this station when omitted. */
+  z_mm?: number;
   mass_kg: number;
   notes?: string;
 }

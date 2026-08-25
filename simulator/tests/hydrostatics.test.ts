@@ -32,9 +32,9 @@ describe("displaced volume of a plain cylinder", () => {
 });
 
 describe("bent culms", () => {
-  // The vertical-plane section of an inclined tube is an ellipse. If that is
-  // handled correctly, bending a culm cannot change how much material it has,
-  // so its fully submerged volume must still be pi r^2 L.
+  // Bending a culm cannot change how much material it has, so its fully
+  // submerged volume must still be pi r^2 L. This is the check that the
+  // perpendicular-section integration handles inclined sections correctly.
   it("keep their volume when the bow is curved", () => {
     for (const bow of [
       { curve_start_from_bow_mm: 900, tip_rise_mm: 350, shape: "circular_arc" } as BowCurve,
@@ -42,7 +42,7 @@ describe("bent culms", () => {
     ]) {
       const design = singleCylinderDesign({ length_mm: L_MM, radius_mm: R_MM, bow });
       const geom = buildCulmGeometry(design, design.culms[0]!);
-      expect(culmDisplacedVolume(geom, 5000)).toBeCloseTo(CYLINDER_VOLUME_M3, 4);
+      expect(culmDisplacedVolume(geom, 5000)).toBeCloseTo(CYLINDER_VOLUME_M3, 9);
     }
   });
 });
@@ -126,11 +126,11 @@ describe("equilibrium", () => {
     expect(b.draft_mm).toBeGreaterThan(a.draft_mm);
   });
 
-  it("refuses degrees of freedom V0 does not solve", () => {
+  it("refuses a load case that does not free heave", () => {
     const design = singleCylinderDesign();
     const conditions = conditionsFor(design);
-    conditions.solve = { dof: ["heave", "heel"] };
-    expect(() => solveEquilibrium(design, conditions)).toThrow(/V0 solves heave only/);
+    conditions.solve = { dof: ["heel"] };
+    expect(() => solveEquilibrium(design, conditions)).toThrow(/must include heave/);
   });
 
   it("refuses conditions written for a different design", () => {

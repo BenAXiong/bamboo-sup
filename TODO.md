@@ -2,6 +2,10 @@
 
 ## Immediate
 
+- [ ] Measure a standing rider's CG height. It dominates every stability result
+      and is currently a guess.
+- [ ] Revisit beam and culm diameter: SUP-001 cannot carry a standing rider.
+- [ ] Decide how much bow recurve the trim budget can afford.
 - [x] Freeze V0 input/output contract.
 - [x] Define the canonical `design.json` schema. See `docs/engineering/design-contract.md`.
 - [x] Implement circular-segment buoyancy and longitudinal integration.
@@ -15,10 +19,10 @@
 ## Next
 
 - [ ] Add tapered real-culm profiles.
-- [ ] Add bow curve parameters: start position, tip rise, transition shape.
-- [ ] Add individual culm placement/order.
-- [ ] Add rider longitudinal/lateral position.
-- [ ] Solve equilibrium heel and trim.
+- [x] Add bow curve parameters: start position, tip rise, transition shape.
+- [x] Add individual culm placement/order.
+- [x] Add rider longitudinal/lateral position.
+- [x] Solve equilibrium heel and trim. See `docs/engineering/stability.md`.
 - [ ] Add minimum-freeboard and flooded-culm warnings.
 - [ ] Build a ballast-test protocol for P001.
 - [ ] Compare simulator predictions against physical measurements.
@@ -26,7 +30,7 @@
 ## Research questions to resolve in parallel
 
 - [ ] Benchmark displacement/volume conventions of surfboards, longboards and SUPs.
-- [ ] Determine how much standing-stability margin is reasonable for this intentionally narrow craft.
+- [ ] Determine how much standing-stability margin is reasonable for this intentionally narrow craft. **Now urgent: SUP-001 has negative metacentric height with a standing rider.**
 - [ ] Measure practical bow curvature achievable in candidate culms without unacceptable cracking/ovalisation.
 - [ ] Determine whether a woven bamboo mat/deck earns its mass on a SUP-scale build.
 - [ ] Keep hollowing, folding seams and outriggers as explicit alternatives, not baseline assumptions.
