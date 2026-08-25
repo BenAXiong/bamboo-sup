@@ -13,10 +13,11 @@ npm run report -- ../designs/current/SUP-001.design.json \
 
 ## Source boundaries
 
-- `src/model/` — canonical in-memory types: culm, SUP, rider, assembly.
+- `src/model/` — canonical in-memory types, and the parametric layout generator
+  that turns beam/gap/count parameters into culm placements.
 - `src/physics/` — buoyancy, hydrostatics, heel, trim, stability.
 - `src/geometry/` — parametric culm surfaces, bow curves, waterplane helpers.
-- `src/render/` — Three.js scene and SVG technical views.
+- `src/render/` — Three.js scene, culm meshing and SVG technical views.
 - `src/io/` — design JSON and culm CSV loading/validation, and the schemas themselves.
 - `scripts/` — command-line readouts.
 - `tests/` — hand-solvable reference cases and regressions.

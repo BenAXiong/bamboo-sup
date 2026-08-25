@@ -95,9 +95,32 @@ export interface EquilibriumResult extends HydrostaticState {
 
 export interface SolveOptions {
   stationCount?: number;
-  /** Attitude is solved to this residual offset between buoyancy and gravity, mm. */
+  /**
+   * Attitude is solved to this residual offset between buoyancy and gravity, mm.
+   * Defaults to a fraction of the hull's beam; see `defaultAttitudeTolerance`.
+   */
   attitudeToleranceMm?: number;
   maxAttitudeIterations?: number;
+}
+
+/**
+ * How close the centres of buoyancy and gravity must line up to call it solved.
+ *
+ * A fixed tolerance in millimetres is the wrong shape: on a wide hull it is
+ * tighter than the station discretisation can resolve, so the solver stalls on
+ * numerical noise and reports failure for a design that is in fact extremely
+ * stable. Scaling with beam keeps the test proportionate to the object. At one
+ * part in a thousand of beam, the residual moment is equivalent to the rider
+ * standing a couple of millimetres off from where the load case says.
+ */
+export function defaultAttitudeTolerance(geoms: CulmGeometry[]): number {
+  let halfBeam = 0;
+  for (const g of geoms) {
+    for (const st of g.stations) {
+      halfBeam = Math.max(halfBeam, Math.abs(st.y_mm) + st.r_mm);
+    }
+  }
+  return Math.max(0.05, 0.001 * 2 * halfBeam);
 }
 
 /** Mass of the built object itself: culms, cross-members, lashings, fitted extras. */
@@ -366,7 +389,7 @@ export function solveEquilibrium(
 
   const tolerance = conditions.solve?.tolerance_n ?? 0.5;
   const maxIterations = conditions.solve?.max_iterations ?? 100;
-  const attTol = options.attitudeToleranceMm ?? 0.05;
+  const attTol = options.attitudeToleranceMm ?? defaultAttitudeTolerance(geoms);
   const maxAttIter = options.maxAttitudeIterations ?? 60;
 
   const solveHeel = dof.includes("heel");
@@ -693,7 +716,7 @@ export function rightingArm(
       {
         tolerance,
         maxIterations,
-        attTol: options.attitudeToleranceMm ?? 0.05,
+        attTol: options.attitudeToleranceMm ?? defaultAttitudeTolerance(geoms),
         maxAttIter: options.maxAttitudeIterations ?? 60,
       },
       attitude,

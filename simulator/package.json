@@ -8,11 +8,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "report": "vite-node scripts/report.ts"
+    "report": "vite-node scripts/report.ts",
+    "views": "vite-node scripts/views.ts",
+    "dev": "vite",
+    "build": "vite build"
   },
   "dependencies": {
+    "@types/three": "^0.185.4",
     "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "three": "^0.185.1",
+    "vite": "^5.4.21"
   },
   "devDependencies": {
     "@types/node": "^22.7.5",

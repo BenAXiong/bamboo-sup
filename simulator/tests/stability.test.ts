@@ -113,7 +113,9 @@ describe("mass properties", () => {
 describe("equilibrium attitude", () => {
   it("stays upright with the rider on the centreline", () => {
     const design = raftDesign();
-    const result = solveEquilibrium(design, riderAt(design, 0));
+    const result = solveEquilibrium(design, riderAt(design, 0), {
+      attitudeToleranceMm: 0.02,
+    });
     expect(result.floats).toBe(true);
     expect(result.converged).toBe(true);
     expect(result.attitude.heel_deg).toBeCloseTo(0, 2);
@@ -141,7 +143,11 @@ describe("equilibrium attitude", () => {
 
   it("puts buoyancy under gravity once solved", () => {
     const design = raftDesign();
-    const result = solveEquilibrium(design, riderAt(design, -40));
+    // Tighter than the beam-scaled default, to pin the solver down rather than
+    // just confirming it met its own tolerance.
+    const result = solveEquilibrium(design, riderAt(design, -40), {
+      attitudeToleranceMm: 0.02,
+    });
     expect(result.converged).toBe(true);
     expect(Math.abs(result.moment_residual_x_mm)).toBeLessThan(0.05);
     expect(Math.abs(result.moment_residual_y_mm)).toBeLessThan(0.05);
@@ -160,6 +166,22 @@ describe("equilibrium attitude", () => {
     const centred = solveEquilibrium(design, riderAt(design, 0));
     const offset = solveEquilibrium(design, riderAt(design, -40));
     expect(offset.min_freeboard_mm).toBeLessThan(centred.min_freeboard_mm);
+  });
+
+  it("calls a genuinely stable wide raft converged", () => {
+    // Regression: a fixed 0.05 mm attitude tolerance is finer than the station
+    // discretisation resolves on a wide hull, so the solver stalled on noise
+    // and reported failure for a design with metres of metacentric height.
+    const wide = raftDesign([680, 510, 340, 170, 0, -170, -340, -510, -680]);
+    for (const culm of wide.culms) {
+      culm.diameter_base_mm = 160;
+      culm.diameter_tip_mm = 160;
+      culm.placement.z_mm = 80;
+    }
+    const result = solveEquilibrium(wide, riderAt(wide, 0, 1050));
+    expect(result.floats).toBe(true);
+    expect(result.converged).toBe(true);
+    expect(result.min_freeboard_mm).toBeGreaterThan(0);
   });
 
   it("reports no equilibrium rather than inventing one when the rider steps too far", () => {
