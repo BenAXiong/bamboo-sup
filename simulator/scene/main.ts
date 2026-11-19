@@ -20,6 +20,7 @@ import {
 } from "three";
 import GUI from "three/examples/jsm/libs/lil-gui.module.min.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 
 import palafang from "../../designs/rafts/palafang.raft.json";
 import { createEnvironment } from "../src/scene/environment.js";
@@ -92,11 +93,33 @@ const views: Record<string, { pos: [number, number, number]; target: [number, nu
   bow: { pos: [9.5, 1.4, 3.2], target: [3.8, 0.7, 0] },
   deck: { pos: [-5.6, 2.3, 0.4], target: [2, 1.4, 0] },
   lashing: { pos: [-3.4, 0.95, 1.5], target: [-4.0, 0.25, 0.35] },
+  rattan: { pos: [-4.45, 0.62, 0.62], target: [-4.95, 0.22, 0.2] },
   sail: { pos: [-9, 3.5, -9], target: [0.6, 3.6, 0] },
   beach: { pos: [-8, 1.7, -24], target: [0, 3, 0] },
   aerial: { pos: [-16, 14, 18], target: [0, 1, 0] },
 };
+// Close-ups anchored on features of the built raft: offsets in metres from the spot.
+const spotViews: Record<string, { spot: string; offset: [number, number, number]; look?: [number, number, number] }> = {
+  knot: { spot: "knot", offset: [0.42, 0.28, 0.42] },
+  masthead: { spot: "masthead", offset: [0.9, -0.5, 1.2], look: [0, 0.1, 0] },
+};
+function spotToRaftLocal(p: Vector3): Vector3 {
+  // Same transform as the raft group: mm -> m, design z-up -> y-up, centred.
+  const g = current!.group;
+  return new Vector3(p.x / 1000, p.z / 1000, -p.y / 1000).add(g.position.clone().setZ(0));
+}
+function resolveViews(): void {
+  if (!current) return;
+  for (const [name, sv] of Object.entries(spotViews)) {
+    const p = current.spots[sv.spot];
+    if (!p) continue;
+    const t = spotToRaftLocal(p).add(new Vector3(...(sv.look ?? [0, 0, 0])));
+    const pos = t.clone().add(new Vector3(...sv.offset));
+    views[name] = { pos: pos.toArray() as [number, number, number], target: t.toArray() as [number, number, number] };
+  }
+}
 function setView(name: string): void {
+  resolveViews();
   const v = views[name] ?? views["hero"]!;
   root.updateMatrixWorld();
   camera.position.set(...v.pos).applyMatrix4(root.matrixWorld);
@@ -235,3 +258,34 @@ if (STILL) {
 
 // Handy for poking at the scene from the console.
 (window as unknown as Record<string, unknown>).raft = { get spec() { return spec; }, rebuild, setView, camera, controls, scene, Vector3 };
+
+// ---------------------------------------------------------------- export for offline rendering
+// `exportForBlender()` returns the raft as binary glTF (metres, y up, already at
+// its floating draft and heading), the procedural textures as PNG data URLs,
+// the camera views in world space, and the sun and scene settings.
+async function exportForBlender(): Promise<Record<string, unknown>> {
+  if (!current) throw new Error("no raft");
+  bob.position.set(0, 0, 0);
+  bob.rotation.set(0, 0, 0);
+  root.updateMatrixWorld(true);
+  const glb = (await new GLTFExporter().parseAsync(root, { binary: true, onlyVisible: true })) as ArrayBuffer;
+  const bytes = new Uint8Array(glb);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const textures: Record<string, string> = {};
+  for (const [name, m] of Object.entries(mats)) {
+    const mm = m as unknown as { map?: { image?: HTMLCanvasElement }; bumpMap?: { image?: HTMLCanvasElement } };
+    if (mm.map?.image instanceof HTMLCanvasElement) textures[`${name}_color`] = mm.map.image.toDataURL("image/png");
+    if (mm.bumpMap?.image instanceof HTMLCanvasElement) textures[`${name}_bump`] = mm.bumpMap.image.toDataURL("image/png");
+  }
+  resolveViews();
+  const worldViews: Record<string, { pos: number[]; target: number[] }> = {};
+  for (const [k, v] of Object.entries(views)) {
+    worldViews[k] = {
+      pos: new Vector3(...v.pos).applyMatrix4(root.matrixWorld).toArray(),
+      target: new Vector3(...v.target).applyMatrix4(root.matrixWorld).toArray(),
+    };
+  }
+  return { glb: btoa(bin), textures, views: worldViews, spec, fov: camera.fov };
+}
+(window as unknown as Record<string, unknown>).exportForBlender = exportForBlender;

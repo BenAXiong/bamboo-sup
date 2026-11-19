@@ -15,6 +15,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 
 import type { RaftMaterials } from "../materials.js";
 import type { SailSpec } from "../raftSpec.js";
+import type { Member } from "./detail.js";
 import { sweepTube } from "./tube.js";
 
 const SPAR_TINT: [number, number, number] = [0.22, 0.17, 0.11];
@@ -22,7 +23,16 @@ const SPAR_TINT: [number, number, number] = [0.22, 0.17, 0.11];
 export interface SailBuild {
   group: Group;
   /** Rope runs [from, to, sag] for the caller to merge with the other rigging. */
-  ropes: [Vector3, Vector3, number][];
+  ropes: RopeRun[];
+}
+
+export interface RopeRun {
+  a: Vector3;
+  b: Vector3;
+  sag: number;
+  endA?: Member;
+  endB?: Member;
+  kind?: "sheet" | "halyard" | "parrel";
 }
 
 export function buildSail(
@@ -35,7 +45,8 @@ export function buildSail(
   rand: () => number,
 ): SailBuild {
   const group = new Group();
-  const ropes: [Vector3, Vector3, number][] = [];
+  const ropes: RopeRun[] = [];
+  const sparMembers: Member[] = [];
 
   const uTack = -S.balance * S.foot_mm;
   const tack = { u: uTack, h: 0 };
@@ -144,11 +155,21 @@ export function buildSail(
       pts.push({ p: toWorld(uu, hh, sp.w - r * 0.8), r: r * (1 - 0.25 * i / seg) });
     }
     spars.push(sweepTube(pts, { radial: 10, uOffset: rand(), tint: SPAR_TINT }));
+    const p0 = pts[0]!.p;
+    const p1 = pts[pts.length - 1]!.p;
+    const axis = new Vector3().subVectors(p1, p0).normalize();
+    sparMembers.push({ centre: p0.clone().lerp(p1, 0.5), axis, r });
+    const aftEnd: Member = { centre: p1.clone().addScaledVector(axis, -100), axis, r };
 
     // Junk-style sheetlets from the aft ends of the lower battens.
     if (!isYard && k % 2 === 0 && k < panels - 1) {
-      const end = toWorld(b.u, b.h, sailPoint(1, v).w);
-      ropes.push([end, new Vector3(mastX - S.foot_mm * 0.95, 0, deckZ + 800), 0.02]);
+      ropes.push({
+        a: aftEnd.centre.clone(),
+        b: new Vector3(mastX - S.foot_mm * 0.95, 0, deckZ),
+        sag: 0.02,
+        endA: aftEnd,
+        kind: "sheet",
+      });
     }
   }
   const sparMesh = new Mesh(mergeGeometries(spars)!, mats.bamboo);
@@ -157,12 +178,27 @@ export function buildSail(
 
   // Halyard from masthead to the yard.
   const yardHang = sailPoint(0.3, 1);
-  ropes.push([new Vector3(mastX, 0, mastTopZ - 60), toWorld(yardHang.u, yardHang.h, yardHang.w), 0.005]);
+  const yard = sparMembers[sparMembers.length - 1]!;
+  const hang = toWorld(yardHang.u, yardHang.h, yardHang.w);
+  ropes.push({
+    a: new Vector3(mastX, 0, mastTopZ - 90),
+    b: hang,
+    sag: 0.005,
+    endB: { centre: hang.clone().addScaledVector(lee, -yard.r * 0.8), axis: yard.axis, r: yard.r },
+    kind: "halyard",
+  });
   // Luff parrels: short ties from each spar to the mast.
   for (let k = 0; k <= panels; k++) {
     const sp = sailPoint(0.06, k / panels);
     const p = toWorld(sp.u, sp.h, sp.w);
-    ropes.push([p, new Vector3(mastX, 0, p.z + 40), 0]);
+    const spar = sparMembers[k]!;
+    ropes.push({
+      a: p,
+      b: new Vector3(mastX, 0, p.z + 40),
+      sag: 0,
+      endA: { centre: p.clone().addScaledVector(lee, -spar.r * 0.8), axis: spar.axis, r: spar.r },
+      kind: "parrel",
+    });
   }
 
   return { group, ropes };

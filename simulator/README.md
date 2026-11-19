@@ -90,5 +90,24 @@ crossbeams, rattan lashings, rails, keels, oar posts, mast and sail),
 procedural; no image assets). It uses the physics module's `buildBend` for the
 bow but nothing else from physics, and physics never imports it.
 
-`?view=hero|side|bow|deck|lashing|sail|beach|aerial` picks a camera;
-`?still` renders one frame without the panel, for screenshots.
+`?view=hero|side|bow|deck|lashing|rattan|knot|masthead|sail|beach|aerial`
+picks a camera; `?still` renders one frame without the panel, for screenshots.
+
+### Photoreal renders (Blender / Cycles)
+
+`blender/render_raft.py` renders the same raft in Cycles. The geometry is not
+rebuilt in Blender: the scene page exports it, and the script only adds
+shaders (bamboo, rattan, rope, bark sail), an ocean, beach, hills and a sky.
+
+1. Export: `npm run build:scene && node blender/export.cjs out/scene EXPORT_DIR`
+   (needs Playwright). It calls `exportForBlender()` in the page and writes
+   `raft.glb`, `tex/*.png` and `scene.json`.
+2. Render, with Blender's Python or the `bpy` wheel (`pip install bpy`,
+   Python 3.13):
+
+```sh
+python blender/render_raft.py EXPORT_DIR OUT_DIR --views hero,rattan,knot,bow,masthead \
+       --samples 96 --res 1600x900   # add --save-blend to keep a .blend
+```
+
+On a 4-core cloud machine a 1600x900 still at 96 samples takes a few minutes.

@@ -22,7 +22,7 @@
     "irregularity": 0.5,
     "stern_stagger_mm": 220,
     "node_spacing_mm": 380,
-    "scorch": 0.75
+    "scorch": 0.9
   },
   "crossbeams": {
     "count": 10,
@@ -30,7 +30,7 @@
     "last_from_bow_mm": 650,
     "diameter_mm": 75,
     "overhang_mm": 160,
-    "wraps": 4
+    "wraps": 6
   },
   "rails": {
     "enabled": true,
@@ -81,8 +81,8 @@
     }
   },
   "scene": {
-    "sun_elevation_deg": 14,
-    "sun_azimuth_deg": 215,
+    "sun_elevation_deg": 20,
+    "sun_azimuth_deg": 35,
     "draft_fraction": 0.42,
     "wave_strength": 1.0,
     "heading_deg": 18,

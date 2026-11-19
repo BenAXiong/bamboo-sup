@@ -31,7 +31,7 @@ export function createRaftMaterials(): RaftMaterials {
   for (const t of [rattan.map, rattan.bump]) t.repeat.set(1, 1 / 0.3);
   for (const t of [rope.map, rope.bump]) t.repeat.set(1, 1 / 0.05);
 
-  return {
+  const mats: RaftMaterials = {
     bamboo: new MeshStandardMaterial({
       map: bamboo.map,
       bumpMap: bamboo.bump,
@@ -81,4 +81,7 @@ export function createRaftMaterials(): RaftMaterials {
       roughness: 0.85,
     }),
   };
+  // Names carry through glTF export, so the Blender scene can swap in its own shaders.
+  for (const [name, m] of Object.entries(mats)) m.name = name;
+  return mats;
 }

@@ -11,23 +11,22 @@
  * underneath, deck mat, oar posts, then the rig.
  */
 
-import {
-  BufferGeometry,
-  Float32BufferAttribute,
-  Group,
-  InstancedMesh,
-  Matrix4,
-  Mesh,
-  Quaternion,
-  TorusGeometry,
-  Vector3,
-} from "three";
+import { BufferGeometry, Float32BufferAttribute, Group, Mesh, Vector3 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import { buildBend } from "../../geometry/culm.js";
 import type { RaftMaterials } from "../materials.js";
 import { noise1, rng, signed } from "../random.js";
 import type { RaftSpec } from "../raftSpec.js";
+import {
+  type Member,
+  laidRope,
+  memberBasis,
+  rattanLashing,
+  rattanSeizing,
+  riggedRope,
+  ROPE_R,
+} from "./detail.js";
 import { buildSail } from "./sail.js";
 import { straight, sweepTube, type TubePoint } from "./tube.js";
 
@@ -51,11 +50,15 @@ export interface RaftBuild {
   /** Typical deck (crossbeam top) height. */
   deckZ: number;
   hull: CulmPath[];
+  /** Named close-up spots in the design frame (mm), for camera presets. */
+  spots: Record<string, Vector3>;
 }
 
 type RGB = [number, number, number];
 
 const SAMPLE_STEP_MM = 40;
+/** Extra samples round each node (mm along the culm) so the ridge has real geometry. */
+const NODE_OFFSETS = [-60, -30, -16, -9, -5, -2.5, 0, 2.5, 5, 9, 16, 30, 60];
 
 export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   const group = new Group();
@@ -98,7 +101,6 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
 
   const rCentre = baseD[Math.round(half)]! / 2;
   const hull: CulmPath[] = [];
-  const nodeMatrices: Matrix4[] = [];
 
   for (let i = 0; i < N; i++) {
     const kSigned = (i - half) / kMax;
@@ -122,12 +124,40 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     const zAxis = rBase - rCentre;
     const seed = spec.seed * 31 + i * 7;
 
+    // Nodes first: the sampling densifies round them so the ridge is real geometry.
+    const nodes: number[] = [];
+    {
+      let s = 120 + rand() * H.node_spacing_mm * 0.6;
+      while (s < L - 60) {
+        nodes.push(s);
+        const along = s / L;
+        // Internodes are shorter near the butt and the tip.
+        s += H.node_spacing_mm * (0.75 + 0.5 * Math.sin(Math.PI * along)) * (0.88 + 0.24 * rand());
+      }
+    }
+    const scarAngle = nodes.map((_, n) => (n % 2 === 0 ? 0 : Math.PI) + signed(rand) * 0.5);
+    const sSet: number[] = [];
+    const steps = Math.ceil(L / SAMPLE_STEP_MM);
+    for (let j = 0; j <= steps; j++) sSet.push((L * j) / steps);
+    for (const sn of nodes) for (const d of NODE_OFFSETS) sSet.push(sn + d);
+    const sList = [...new Set(sSet.filter((v) => v >= 0 && v <= L).map((v) => Math.round(v * 10) / 10))].sort((a, b) => a - b);
+    const nodeDist = (s: number) => {
+      let best = Infinity;
+      let idx = -1;
+      for (let n = 0; n < nodes.length; n++) {
+        const d = s - nodes[n]!;
+        if (Math.abs(d) < Math.abs(best)) {
+          best = d;
+          idx = n;
+        }
+      }
+      return { d: best, idx };
+    };
+
     const pts: Vector3[] = [];
     const rs: number[] = [];
     const ss: number[] = [];
-    const steps = Math.ceil(L / SAMPLE_STEP_MM);
-    for (let j = 0; j <= steps; j++) {
-      const s = (L * j) / steps;
+    for (const s of sList) {
       let x: number;
       let z: number;
       let f = 0; // 0 on the straight run, 1 at the bow tip
@@ -141,7 +171,10 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
         f = (s - straightLen) / curve;
       }
       const taperHere = 1 + (taper - 1) * (s / L);
-      const r = rBase * taperHere * (1 + 0.025 * irr * noise1(s / 900, seed + 3));
+      const nd = nodeDist(s).d;
+      // Node: a sharp ridge on a slight swelling.
+      const ridge = 1 + 0.028 * Math.exp(-((nd / 6) ** 2)) + 0.012 * Math.exp(-((nd / 45) ** 2));
+      const r = rBase * taperHere * (1 + 0.025 * irr * noise1(s / 900, seed + 3)) * ridge;
       // Stay packed as the culms taper, and tuck the bow in toward the centreline.
       const y =
         yBase[i]! * (0.55 + 0.45 * taperHere) * (1 - H.bow.tuck * f * f) +
@@ -161,25 +194,35 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
       const s = ss[j]!;
       let c: RGB = [...base];
       const weather = 0.88 + 0.12 * noise1(s / 650, seed + 13);
-      c = [c[0] * weather, c[1] * weather, c[2] * weather];
+      const nodeLine = 1 - 0.45 * Math.exp(-((nodeDist(s).d / 3.5) ** 2)) - 0.12 * Math.exp(-((nodeDist(s).d / 25) ** 2));
+      c = [c[0] * weather * nodeLine, c[1] * weather * nodeLine, c[2] * weather * nodeLine];
       const bendStart = L - curve;
       if (s > bendStart - 200) {
         const f = (s - bendStart) / curve;
-        const zone = smoothstep(-0.05, 0.25, f) * (1 - smoothstep(0.85, 1.0, f) * 0.5);
-        const patch = 0.6 + 0.4 * noise1(s / 140, seed + 17);
+        const zone = smoothstep(-0.08, 0.2, f) * (1 - smoothstep(0.9, 1.0, f) * 0.4);
+        const patch = Math.min(1, 0.9 + 0.35 * noise1(s / 160, seed + 17));
         const burn = H.scorch * zone * patch;
-        c = mix(c, [0.035, 0.028, 0.02], burn);
+        c = mix(c, [0.012, 0.009, 0.007], burn);
       }
       return { p, r: rs[j]!, color: c };
     });
     const geom = sweepTube(tube, {
       radial: 18,
       uOffset: rand(),
-      colorAround: (_j, out) => {
+      colorAround: (j, out) => {
         // Underside wet and algae-stained; the top bleached a little by sun.
         const down = Math.max(0, -out.z);
         const up = Math.max(0, out.z);
-        return [1 - 0.45 * down + 0.08 * up, 1 - 0.38 * down + 0.08 * up, 1 - 0.42 * down + 0.06 * up];
+        let k = 1;
+        // Bud scar just above each node, alternating sides like the real culm.
+        const nd = nodeDist(ss[j]!);
+        if (nd.idx >= 0 && nd.d > 0 && nd.d < 26) {
+          const ang = Math.atan2(out.y, out.z);
+          let da = Math.abs(ang - scarAngle[nd.idx]!);
+          if (da > Math.PI) da = 2 * Math.PI - da;
+          if (da < 0.32) k = 0.55 + 0.45 * Math.min(1, da / 0.32 + Math.abs(nd.d - 12) / 16);
+        }
+        return [k * (1 - 0.45 * down + 0.08 * up), k * (1 - 0.38 * down + 0.08 * up), k * (1 - 0.42 * down + 0.06 * up)];
       },
     });
     const mesh = new Mesh(geom, mats.bamboo);
@@ -187,18 +230,6 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     mesh.receiveShadow = true;
     group.add(mesh);
 
-    // Nodes: raised rings at irregular spacing.
-    let s = 120 + rand() * H.node_spacing_mm * 0.6;
-    while (s < L - 60) {
-      const j = Math.min(pts.length - 2, Math.round(s / (L / steps)));
-      const p = pts[j]!;
-      const t = new Vector3().subVectors(pts[j + 1]!, pts[Math.max(0, j - 1)]!).normalize();
-      nodeMatrices.push(ringMatrix(p, t, rs[j]!));
-      const along = s / L;
-      // Internodes are shorter near the butt and the tip.
-      const spacing = H.node_spacing_mm * (0.75 + 0.5 * Math.sin(Math.PI * along)) * (0.88 + 0.24 * rand());
-      s += spacing;
-    }
   }
 
   // ------------------------------------------------------------- crossbeams
@@ -209,6 +240,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   const sFirst = C.first_from_stern_mm;
   const sLast = centre.length - C.last_from_bow_mm;
   const lashingGeoms: BufferGeometry[] = [];
+  const spots: Record<string, Vector3> = {};
   const beams: { x: number; zAt: (y: number) => number; yPort: number; yStbd: number }[] = [];
   let deckZ = -Infinity;
 
@@ -242,7 +274,12 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     // Rattan lashing at each culm crossing.
     crossings.forEach((c, i) => {
       lashingGeoms.push(
-        lashing(x, c.p.y, c.p.z, c.r, zAt(c.p.y), rb, C.wraps, (i + b) % 2 === 0, rand),
+        rattanLashing(
+          { centre: c.p, axis: culmAxisAt(hull[i]!, x), r: c.r },
+          { centre: new Vector3(x, c.p.y, zAt(c.p.y)), axis: new Vector3(0, 1, 0), r: rb },
+          C.wraps,
+          rand,
+        ),
       );
     });
   }
@@ -279,7 +316,14 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
         for (const bm of beams) {
           if (bm.x < xa + 100 || bm.x > xb - 100) continue;
           const at = pts.reduce((best, q) => (Math.abs(q.p.x - bm.x) < Math.abs(best.p.x - bm.x) ? q : best));
-          lashingGeoms.push(lashing(bm.x, at.p.y, bm.zAt(at.p.y), rb, at.p.z, at.r, 3, side > 0, rand));
+          lashingGeoms.push(
+            rattanLashing(
+              { centre: new Vector3(bm.x, at.p.y, bm.zAt(at.p.y)), axis: new Vector3(0, 1, 0), r: rb },
+              { centre: new Vector3(bm.x, at.p.y, at.p.z), axis: new Vector3(1, 0, 0), r: at.r },
+              3,
+              rand,
+            ),
+          );
         }
       }
     }
@@ -311,7 +355,14 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
         for (const bm of beams) {
           if (bm.x < xc - len / 2 + 80 || bm.x > xc + len / 2 - 80) continue;
           const h = sampleAtX(host, bm.x);
-          lashingGeoms.push(lashing(bm.x + 40, h.p.y, h.p.z - h.r - rk - 6, rk, h.p.z, h.r, 3, k % 2 === 0, rand));
+          lashingGeoms.push(
+            rattanLashing(
+              { centre: new Vector3(bm.x + 40, h.p.y, h.p.z - h.r - rk - 6), axis: new Vector3(1, 0, 0), r: rk },
+              { centre: new Vector3(bm.x + 40, h.p.y, h.p.z), axis: new Vector3(1, 0, 0), r: h.r },
+              4,
+              rand,
+            ),
+          );
         }
       }
     }
@@ -374,7 +425,15 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
         const m = new Mesh(mergeGeometries([post, fa, fb])!, mats.wood);
         m.castShadow = true;
         group.add(m);
-        lashingGeoms.push(lashing(bm.x, y, bm.zAt(y), rb, base.z + 60, 34, 3, true, rand));
+        lashingGeoms.push(rattanSeizing({ centre: base.clone().addScaledVector(dir, 20), axis: dir, r: 33 }, 5));
+        lashingGeoms.push(
+          rattanLashing(
+            { centre: new Vector3(bm.x, y, bm.zAt(y)), axis: new Vector3(0, 1, 0), r: rb },
+            { centre: new Vector3(bm.x, y, bm.zAt(y) + rb + 34), axis: new Vector3(1, 0, 0), r: 34 },
+            2,
+            rand,
+          ),
+        );
       }
     }
   }
@@ -404,19 +463,44 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
       brace.castShadow = true;
       group.add(brace);
     }
-    lashingGeoms.push(collar(new Vector3(mastX, 0, mastBaseZ + 900), rm + 6, 7));
+    lashingGeoms.push(rattanSeizing({ centre: new Vector3(mastX, 0, mastBaseZ + 860), axis: new Vector3(0, 0, 1), r: rm * 0.93 + 6 }, 9));
+    lashingGeoms.push(rattanSeizing({ centre: new Vector3(mastX, 0, mastBaseZ + 40), axis: new Vector3(0, 0, 1), r: rm }, 6));
 
     const ropeGeoms: BufferGeometry[] = [];
+    const mastAt = (z: number): Member => ({
+      centre: new Vector3(mastX, 0, z),
+      axis: new Vector3(0, 0, 1),
+      r: rm * (1 - 0.4 * ((z - centre.pts[0]!.z) / (mastTop.z - centre.pts[0]!.z))),
+    });
+    const beamMember = (bm: (typeof beams)[number], y: number): Member => ({
+      centre: new Vector3(bm.x, y, bm.zAt(y)),
+      axis: new Vector3(0, 1, 0),
+      r: rb,
+    });
     if (G.stays) {
+      // Every stay is made fast at the masthead with turns round the mast.
+      const head = mastTop.clone().add(new Vector3(0, 0, -260));
+      spots["masthead"] = head.clone();
+      ropeGeoms.push(laidRopeSeizing(mastAt(head.z), 5));
       const bowTip = centre.pts[centre.pts.length - 1]!;
-      const sternEnd = centre.pts[0]!.clone().add(new Vector3(150, 0, rCentre));
-      ropeGeoms.push(rope(mastTop, bowTip.clone().add(new Vector3(-120, 0, 30)), 0.01));
-      ropeGeoms.push(rope(mastTop, sternEnd, 0.012));
+      const nearTip = sampleAtS(centre, centre.length - 260);
+      const tipAxis = culmAxisAt(centre, nearTip.p.x);
+      ropeGeoms.push(
+        riggedRope(head, nearTip.p.clone().add(new Vector3(0, 0, nearTip.r + ROPE_R)), 0.01, undefined, {
+          centre: nearTip.p,
+          axis: tipAxis,
+          r: nearTip.r,
+        }),
+      );
+      void bowTip;
+      const sternBeam = beams[0]!;
+      ropeGeoms.push(riggedRope(head, new Vector3(sternBeam.x, 0, sternBeam.zAt(0) + rb), 0.012, undefined, beamMember(sternBeam, 0)));
       for (const side of [1, -1]) {
         for (const dx of [-900, 500]) {
           const bm = nearestBeam(beams, mastX + dx);
-          const y = side > 0 ? bm.yPort - 40 : bm.yStbd + 40;
-          ropeGeoms.push(rope(mastTop.clone().add(new Vector3(0, 0, -150)), new Vector3(bm.x, y, bm.zAt(y)), 0.008));
+          const y = side > 0 ? bm.yPort - 60 : bm.yStbd + 60;
+          if (side < 0 && dx < 0) spots["knot"] = new Vector3(bm.x, y, bm.zAt(y));
+          ropeGeoms.push(riggedRope(head, new Vector3(bm.x, y, bm.zAt(y) + rb), 0.008, undefined, beamMember(bm, y)));
         }
       }
     }
@@ -424,7 +508,18 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     if (G.sail.enabled) {
       const sail = buildSail(G.sail, mastX, mastBaseZ, mastTop.z, rm, mats, rand);
       group.add(sail.group);
-      ropeGeoms.push(...sail.ropes.map(([a, b2, sag]) => rope(a, b2, sag)));
+      for (const run of sail.ropes) {
+        if (run.kind === "sheet") {
+          // Sheets gather on the crossbeam under the sheeting point.
+          const bm = nearestBeam(beams, run.b.x);
+          const y = Math.max(bm.yStbd + 100, Math.min(bm.yPort - 100, run.b.y));
+          ropeGeoms.push(riggedRope(run.a, new Vector3(bm.x, y, bm.zAt(y) + rb), run.sag, run.endA, beamMember(bm, y)));
+        } else if (run.kind === "halyard") {
+          ropeGeoms.push(riggedRope(run.a, run.b, run.sag, mastAt(run.a.z), run.endB));
+        } else {
+          ropeGeoms.push(riggedRope(run.a, run.b, run.sag, run.endA, run.endB));
+        }
+      }
     }
     if (ropeGeoms.length) {
       const m = new Mesh(mergeGeometries(ropeGeoms)!, mats.rope);
@@ -434,14 +529,6 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   }
 
   // ---------------------------------------------------------------- nodes + lashings
-  if (nodeMatrices.length) {
-    const ring = new TorusGeometry(1, 0.06, 8, 24);
-    const inst = new InstancedMesh(ring, mats.node, nodeMatrices.length);
-    nodeMatrices.forEach((m, i) => inst.setMatrixAt(i, m));
-    inst.castShadow = true;
-    inst.receiveShadow = true;
-    group.add(inst);
-  }
   if (lashingGeoms.length) {
     const m = new Mesh(mergeGeometries(lashingGeoms)!, mats.rattan);
     m.castShadow = true;
@@ -457,6 +544,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     length: Math.max(...xs) - Math.min(...xs),
     deckZ: Number.isFinite(deckZ) ? deckZ : rCentre,
     hull,
+    spots,
   };
 }
 
@@ -536,84 +624,25 @@ function fitEven(ys: number[], zs: number[]): (y: number) => number {
   return (y) => a + c * y * y;
 }
 
-function ringMatrix(p: Vector3, t: Vector3, r: number): Matrix4 {
-  const q = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), t);
-  return new Matrix4().compose(p, q, new Vector3(r * 1.01, r * 1.01, r * 1.01));
+function culmAxisAt(c: CulmPath, x: number): Vector3 {
+  let j = 0;
+  for (let k = 0; k < c.pts.length; k++) if (c.pts[k]!.x <= x) j = k;
+  const a = c.pts[Math.max(0, j - 2)]!;
+  const b = c.pts[Math.min(c.pts.length - 1, j + 2)]!;
+  return new Vector3().subVectors(b, a).normalize();
 }
 
-/**
- * Rattan wraps binding a lower round member (centre y, zLow, radius rLow) to an
- * upper one above it (zHigh, rHigh). Loops go round both, alternately skewed so
- * neighbouring wraps cross in an X like a real tensioned lashing.
- */
-function lashing(
-  x: number,
-  y: number,
-  zLow: number,
-  rLow: number,
-  zHigh: number,
-  rHigh: number,
-  wraps: number,
-  flip: boolean,
-  rand: () => number,
-): BufferGeometry {
-  const strip = 5.5;
-  const geoms: BufferGeometry[] = [];
-  const w = Math.max(1, Math.round(wraps));
-  for (let k = 0; k < w; k++) {
-    const offset = (k - (w - 1) / 2) * strip * 2.6 + signed(rand) * 2;
-    const skew = ((k % 2 === 0) !== flip ? 1 : -1) * (rHigh * 0.9);
-    const pts: TubePoint[] = [];
-    const seg = 44;
-    for (let j = 0; j <= seg; j++) {
-      const th = (j / seg) * Math.PI * 2;
-      // Stadium around both circles: upper half wraps the upper member, lower half the lower one.
-      const c = Math.cos(th);
-      const sn = Math.sin(th);
-      const top = sn >= 0;
-      const rr = (top ? rHigh : rLow) + strip * 0.9;
-      const zc = top ? zHigh : zLow;
-      const py = y + c * rr;
-      const pz = zc + sn * rr;
-      const zMid = (zHigh + zLow) / 2;
-      const span = Math.max(1, (zHigh - zLow) / 2 + rHigh);
-      const px = x + offset + skew * ((pz - zMid) / span);
-      pts.push({ p: new Vector3(px, py, pz), r: strip });
-    }
-    geoms.push(sweepTube(pts, { radial: 6, caps: false, uOffset: rand() }));
+/** Close turns of rope round a member, as at the masthead where the stays are made fast. */
+function laidRopeSeizing(m: Member, turns: number): BufferGeometry {
+  const { n, b } = memberBasis(m.axis);
+  const pts: Vector3[] = [];
+  const seg = turns * 36;
+  for (let j = 0; j <= seg; j++) {
+    const th = (j / seg) * turns * Math.PI * 2;
+    const dir = n.clone().multiplyScalar(Math.cos(th)).addScaledVector(b, Math.sin(th));
+    pts.push(m.centre.clone().addScaledVector(dir, m.r + ROPE_R).addScaledVector(m.axis, (th / (Math.PI * 2)) * ROPE_R * 2.1));
   }
-  return mergeGeometries(geoms)!;
-}
-
-/** A band of tight rattan turns round a single member. */
-function collar(centre: Vector3, r: number, turns: number): BufferGeometry {
-  const geoms: BufferGeometry[] = [];
-  for (let k = 0; k < turns; k++) {
-    const pts: TubePoint[] = [];
-    for (let j = 0; j <= 28; j++) {
-      const th = (j / 28) * Math.PI * 2;
-      pts.push({
-        p: new Vector3(centre.x + Math.cos(th) * r, centre.y + Math.sin(th) * r, centre.z + k * 11),
-        r: 5,
-      });
-    }
-    geoms.push(sweepTube(pts, { radial: 6, caps: false }));
-  }
-  return mergeGeometries(geoms)!;
-}
-
-/** A rope between two points with a little sag. */
-export function rope(a: Vector3, b: Vector3, sag: number): BufferGeometry {
-  const len = a.distanceTo(b);
-  const pts: TubePoint[] = [];
-  const seg = 24;
-  for (let i = 0; i <= seg; i++) {
-    const t = i / seg;
-    const p = a.clone().lerp(b, t);
-    p.z -= 4 * sag * len * t * (1 - t);
-    pts.push({ p, r: 7 });
-  }
-  return sweepTube(pts, { radial: 6, caps: false });
+  return laidRope(pts);
 }
 
 function beamTone(rand: () => number): RGB {
