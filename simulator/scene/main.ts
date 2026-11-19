@@ -52,6 +52,12 @@ const env = createEnvironment(scene, renderer);
 const mats = createRaftMaterials();
 
 let spec: RaftSpec = cloneSpec(palafang as RaftSpec);
+// ?sailing: the sail drawing under way (bellied, sheeted out) instead of hanging slack on the beach.
+if (params.has("sailing")) {
+  spec.rig.sail.camber = 0.065;
+  spec.rig.sail.panel_sag = 0.01;
+  spec.rig.sail.sheet_angle_deg = 24;
+}
 
 // World placement: root (heading, position) -> bob (wave motion) -> raft (design frame, mm).
 const root = new Group();

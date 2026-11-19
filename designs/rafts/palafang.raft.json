@@ -27,8 +27,8 @@
     "irregularity": 0.55,
     "stern_stagger_mm": 280,
     "node_spacing_mm": 360,
-    "scorch": 0.35,
-    "bow_stagger_mm": 220
+    "scorch": 0.6,
+    "bow_stagger_mm": 350
   },
   "crossbeams": {
     "count": 8,
@@ -74,9 +74,9 @@
       0.15,
       0.68
     ],
-    "height_mm": 950,
-    "outward_tilt_deg": 10,
-    "log_length_mm": 460,
+    "height_mm": 900,
+    "outward_tilt_deg": 12,
+    "log_length_mm": 720,
     "log_diameter_mm": 190,
     "splay_deg": 13,
     "oars": {
@@ -85,7 +85,7 @@
       "blade_length_mm": 900,
       "blade_width_mm": 190,
       "shaft_diameter_mm": 45,
-      "elevation_deg": 21
+      "elevation_deg": 28
     }
   },
   "rig": {

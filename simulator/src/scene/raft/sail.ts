@@ -16,9 +16,10 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { RaftMaterials } from "../materials.js";
 import type { SailSpec } from "../raftSpec.js";
 import type { Member } from "./detail.js";
+import { rattanSeizing } from "./detail.js";
 import { sweepTube } from "./tube.js";
 
-const SPAR_TINT: [number, number, number] = [0.24, 0.22, 0.19];
+const SPAR_TINT: [number, number, number] = [0.62, 0.52, 0.38];
 
 export interface SailBuild {
   group: Group;
@@ -134,6 +135,7 @@ export function buildSail(
 
   // ---------------------------------------------------------------- spars
   const spars: BufferGeometry[] = [];
+  const ties: BufferGeometry[] = [];
   for (let k = 0; k <= panels; k++) {
     const v = k / panels;
     const isBoom = k === 0;
@@ -160,6 +162,11 @@ export function buildSail(
     const axis = new Vector3().subVectors(p1, p0).normalize();
     sparMembers.push({ centre: p0.clone().lerp(p1, 0.5), axis, r });
     const aftEnd: Member = { centre: p1.clone().addScaledVector(axis, -100), axis, r };
+    // Battens are tied through the cloth every ~30 cm (small lumps in the photos).
+    const len = p0.distanceTo(p1);
+    for (let d = ext + 120 + rand() * 60; d < len - ext - 60; d += 290 + rand() * 50) {
+      ties.push(rattanSeizing({ centre: p0.clone().addScaledVector(axis, d), axis, r: r * 0.95 }, 2 + Math.round(rand())));
+    }
 
     // Junk-style sheetlets from the aft ends of the lower battens.
     if (!isYard && k % 2 === 0 && k < panels - 1) {
@@ -172,9 +179,14 @@ export function buildSail(
       });
     }
   }
-  const sparMesh = new Mesh(mergeGeometries(spars)!, mats.bamboo);
+  const sparMesh = new Mesh(mergeGeometries(spars)!, mats.mast);
   sparMesh.castShadow = true;
   group.add(sparMesh);
+  if (ties.length) {
+    const tieMesh = new Mesh(mergeGeometries(ties)!, mats.rattan);
+    tieMesh.castShadow = true;
+    group.add(tieMesh);
+  }
 
   // Halyard from masthead to the yard.
   const yardHang = sailPoint(0.3, 1);

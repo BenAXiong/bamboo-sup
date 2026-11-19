@@ -383,45 +383,84 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
         const side = rail.side;
         const x = H.length_mm * f + signed(rand) * 80;
         const rp = rail.at(x);
-        const c = rp.p.clone().add(new Vector3(0, side * 10, rp.r * 0.55 + lr * 0.55));
+        // Hewn, roughly squared log lying along the rail, hollowed underneath to sit over it.
+        const c = rp.p.clone().add(new Vector3(0, side * 8, rp.r * 0.45 + lr * 0.8));
         const ll = O.log_length_mm * (0.9 + 0.2 * rand());
-        // Hewn, roughly squared log.
-        const lpts = straight(c.clone().add(new Vector3(-ll / 2, 0, 0)), c.clone().add(new Vector3(ll / 2, 0, 0)), (t) => lr * (1 + 0.05 * Math.sin(t * 5 + si)), 8);
-        logGeoms.push(sweepTube(lpts, { radial: 24, uOffset: rand(), caps: true, shape: (_i, th) => 1 + 0.09 * Math.cos(4 * th) }));
+        const lpts = straight(c.clone().add(new Vector3(-ll / 2, 0, 0)), c.clone().add(new Vector3(ll / 2, 0, 0)), (t) => lr * (1 + 0.04 * Math.sin(t * 7 + si)), 10);
+        logGeoms.push(
+          sweepTube(lpts, {
+            radial: 28,
+            uOffset: rand(),
+            caps: true,
+            // Squared section, a little taller than wide, with axe-flattened faces.
+            shape: (_i, th) => (1 + 0.16 * Math.cos(4 * th + 0.785)) * (1 - 0.1 * Math.cos(2 * th)),
+          }),
+        );
         const logTop = c.z + lr * 0.95;
-        // Log bound to rail and outer culm at both ends.
-        for (const dx of [-ll / 2 + 70, ll / 2 - 70]) {
+        // Log bound to rail and outer culm near both ends.
+        for (const dx of [-ll / 2 + 90, ll / 2 - 90]) {
           const q = rail.at(x + dx);
           const oc = interpAtX(side > 0 ? hull[0]! : hull[N - 1]!, x + dx);
           lashingGeoms.push(
-            bundleRing([{ c: q.p, r: q.r }, { c: c.clone().add(new Vector3(dx, 0, 0)), r: lr * 0.97 }, { c: oc.p.clone().setX(q.p.x), r: oc.r }], new Vector3(1, 0, 0), 5, rand, 2),
+            bundleRing([{ c: q.p, r: q.r }, { c: c.clone().add(new Vector3(dx, 0, 0)), r: lr * 1.02 }, { c: oc.p.clone().setX(q.p.x), r: oc.r }], new Vector3(1, 0, 0), 5, rand, 2),
           );
         }
-        const tips: Vector3[] = [];
-        for (const fa of [-1, 1]) {
-          const base = new Vector3(x + fa * ll * 0.2, c.y + side * lr * 0.15, logTop - 10);
-          const dir = new Vector3(fa * Math.sin(splay), side * Math.sin(tilt), 1).normalize();
-          const h = O.height_mm * (0.92 + 0.16 * rand());
+        // Two brace branches set in holes in the log's inboard face, lying
+        // inboard across the culms, each tied down by two rattan knots
+        // (reference photos 22 and 23): one nearly square across, one raking.
+        const braces: { dx: number; ang: number; len: number }[] = [
+          { dx: -ll * 0.28, ang: (signed(rand) * 12 * Math.PI) / 180, len: 900 + rand() * 200 },
+          { dx: ll * 0.28, ang: ((side > 0 ? 1 : 1) * (38 + rand() * 10) * Math.PI) / 180, len: 1050 + rand() * 250 },
+        ];
+        for (const br of braces) {
+          const start = new Vector3(x + br.dx, c.y - side * lr * 0.7, c.z - lr * 0.1);
+          // Direction: inboard (-side in y), raked by ang toward the bow.
+          const dir = new Vector3(Math.sin(br.ang), -side * Math.cos(br.ang), 0).normalize();
           const bpts: TubePoint[] = [];
-          const seg = 14;
+          const seg = 16;
+          // A rigid branch: straight from its hole in the log down to where its
+          // far end rests on the culms, lifted only where a culm is in the way.
+          const far = start.clone().addScaledVector(dir, br.len);
+          const zEnd = matZ(hull, far.x, far.y) + 14 + 18;
           for (let j = 0; j <= seg; j++) {
             const t = j / seg;
-            const p = base.clone().addScaledVector(dir, -90 + (h + 90) * t);
-            p.x += irr * 22 * Math.sin(t * 3.1 + si + fa) * t;
-            p.y += irr * 14 * Math.sin(t * 2.3 + fa * 2) * t;
-            bpts.push({ p, r: 25 * (1 - 0.35 * t) * (1 + 0.08 * Math.sin(t * 17 + fa)) });
+            const p = start.clone().addScaledVector(dir, -60 + (br.len + 60) * t);
+            const rr = 26 * (1 - 0.3 * t) * (1 + 0.1 * Math.sin(t * 13 + br.dx));
+            p.z = start.z + (zEnd - start.z) * Math.max(0, t);
+            const clear = matZ(hull, p.x, p.y) + 10 + rr;
+            if (t > 0.1) p.z = Math.max(p.z, clear);
+            // Natural crooked branch: a slow bow plus a kink or two.
+            const crook = irr * 95 * (Math.sin(t * 3.1 + br.dx) * t + 0.45 * Math.sin(t * 7.3 + br.dx * 2) * t);
+            p.x += -dir.y * crook;
+            p.y += dir.x * crook;
+            bpts.push({ p, r: rr });
           }
+          // Smooth the lifted spots so the branch stays stiff.
+          for (let pass = 0; pass < 4; pass++)
+            for (let j = 1; j < seg; j++) bpts[j]!.p.z = Math.max(bpts[j]!.p.z, (bpts[j - 1]!.p.z + bpts[j + 1]!.p.z) / 2);
           stickGeoms.push(sweepTube(bpts, { radial: 12, uOffset: rand(), caps: true }));
-          tips.push(bpts[seg]!.p);
-          // Two rattan knots per branch, where it leaves the log.
-          for (const [along, turns] of [
-            [30, 5],
-            [120, 4],
-          ] as const) {
-            lashingGeoms.push(rattanSeizing({ centre: base.clone().addScaledVector(dir, along), axis: dir, r: 25 * (1 - 0.35 * (along / h)) + 2 }, turns));
+          for (const t of [0.45, 0.85]) {
+            const p = bpts[Math.round(t * seg)]!;
+            const host = nearestCulmAtY(hull, p.p.x, p.p.y);
+            const hc = host.p.clone();
+            hc.x = p.p.x;
+            lashingGeoms.push(bundleRing([{ c: hc, r: host.r }, { c: p.p.clone(), r: p.r }], new Vector3(-dir.y, dir.x, 0), 4, rand, 1.5));
           }
         }
+        // Thole pin: a squared stick standing in a hole on top of the log,
+        // leaning outboard; the oar works against it.
+        const pinDir = new Vector3(signed(rand) * 0.05, side * Math.sin(tilt), Math.cos(tilt)).normalize();
+        const pinBase = new Vector3(x, c.y, logTop - 60);
+        const pinH = O.height_mm * (0.95 + 0.1 * rand());
+        stickGeoms.push(
+          sweepTube(straight(pinBase, pinBase.clone().addScaledVector(pinDir, pinH), (t) => 24 * (1 - 0.25 * t), 8), {
+            radial: 16,
+            caps: true,
+            shape: (_i, th) => 1 + 0.12 * Math.cos(4 * th),
+          }),
+        );
         if (si === 0 && side > 0) spots["oarpost"] = new Vector3(x, c.y, logTop + 200);
+        void splay;
 
         // Oar.
         const OA = O.oars;
@@ -432,7 +471,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
           const yaw = side * (0.03 + 0.05 * rand());
           const dir = new Vector3(Math.cos(el) * Math.cos(yaw), -Math.cos(el) * Math.sin(yaw), Math.sin(el)).normalize();
           const rs0 = OA.shaft_diameter_mm / 2;
-          const pivot = new Vector3(x, c.y - side * (40 + rs0), logTop + rs0);
+          const pivot = new Vector3(x + 20, c.y - side * (28 + rs0), logTop + rs0);
           const tDeck = (pivot.z - (deckZ + rs0)) / dir.z;
           const handle = pivot.clone().addScaledVector(dir, -tDeck);
           const tip = handle.clone().addScaledVector(dir, OA.length_mm);
@@ -454,7 +493,6 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
           // Build the blade so its wide axis is along x (fore and aft).
           oarGeoms.push(bladeGeometry(bp, aspect, new Vector3(1, 0, 0)));
           lashingGeoms.push(rattanSeizing({ centre: handle.clone().addScaledVector(dir, 120), axis: dir, r: rs * 0.85 + 2 }, 3));
-          void tips;
         }
       }
     });

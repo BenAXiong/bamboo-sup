@@ -114,21 +114,22 @@ export interface DeckSpec {
 
 export interface OarPostSpec {
   /**
-   * Oar posts (thole posts), one per side at each station. Each is a
-   * hollowed-out log fitted on the rail, with two branches set in holes inside
-   * it, each branch held by two rattan knots. The oar passes between the two
-   * branches.
+   * Oar posts, one per side at each station (Ben, 2026-11-19, and reference
+   * photos 3, 22, 23): a hewn log hollowed underneath to fit over the rail,
+   * with two brace branches set in holes in its inboard face and lying inboard
+   * across the culms, each brace held down by two rattan knots. A squared
+   * thole pin stands in a hole on top of the log.
    */
   enabled: boolean;
   /** Post stations, as fractions of hull length from the stern. */
   stations_fraction: number[];
-  /** Height of the branches above the log. */
+  /** Height of the thole pin above the log. */
   height_mm: number;
   outward_tilt_deg: number;
   /** Log length along the rail and diameter. */
   log_length_mm: number;
   log_diameter_mm: number;
-  /** Fore-and-aft splay of the two branches, degrees each side of vertical. */
+  /** Unused since the brace rebuild; kept so older specs still load. */
   splay_deg: number;
   /** Oars: one per post, stowed between the branches, blade raised outboard. */
   oars: { enabled: boolean; length_mm: number; blade_length_mm: number; blade_width_mm: number; shaft_diameter_mm: number; elevation_deg: number };

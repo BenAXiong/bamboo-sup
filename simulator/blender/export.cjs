@@ -1,5 +1,5 @@
 // Headless export of the raft for Blender. Needs `playwright` and a built scene:
-//   npm run build:scene && node blender/export.cjs out/scene EXPORT_DIR
+//   npm run build:scene && node blender/export.cjs out/scene EXPORT_DIR [extra-query, e.g. sailing]
 
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
@@ -11,7 +11,7 @@ const srv = http.createServer((q,r)=>{ let p = path.join(root, decodeURIComponen
   const b = await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const pg = await b.newPage({viewport:{width:640,height:360}});
   pg.on('pageerror', e=>console.log('pageerror:', e.message));
-  await pg.goto('http://localhost:5180/index.html?still');
+  await pg.goto('http://localhost:5180/index.html?still' + (process.argv[4] ? '&' + process.argv[4] : ''));
   await pg.waitForFunction(()=>window.__ready===true,{timeout:240000});
   const res = await pg.evaluate(async()=>await window.exportForBlender());
   fs.writeFileSync(path.join(out,'raft.glb'), Buffer.from(res.glb,'base64'));

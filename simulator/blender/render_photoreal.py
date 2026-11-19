@@ -155,6 +155,17 @@ class Nodes:
         return n.outputs["Normal"]
 
 
+def ao_grime(N, color, distance, strength):
+    """Darken crevices and contact areas (dirt and shade collect there)."""
+    ao = N.new("ShaderNodeAmbientOcclusion", samples=8, only_local=False)
+    ao.inputs["Distance"].default_value = distance
+    k = N.maprange(ao.outputs["AO"], 0.0, 1.0, 1.0 - strength, 1.0)
+    kc = N.new("ShaderNodeCombineColor")
+    for i in range(3):
+        N.link(k, kc.inputs[i])
+    return N.mix(1.0, color, kc.outputs[0], "MULTIPLY")
+
+
 def srgb(c):
     """sRGB 0..255 triple -> linear 0..1."""
     def f(v):
@@ -169,6 +180,7 @@ class Shaders:
     def __init__(self, export_dir, assets_dir):
         self.T = lambda name: os.path.join(export_dir, "tex", name + ".png")
         self.A = lambda name: os.path.join(assets_dir, "tex", name + ".jpg")
+        self.G = lambda name: os.path.join(assets_dir, "gen", name + ".png")
 
     # Weathered bamboo, matched to the photos: neutral to warm grey, darker
     # grey-brown culms mixed in, silvery where sun-bleached, fine lengthwise
@@ -191,11 +203,11 @@ class Shaders:
             stops = [(0.0, srgb((150, 128, 98))), (0.6, srgb((132, 118, 98))), (1.0, srgb((118, 108, 96)))]
         else:
             stops = [
-                (0.0, srgb((118, 108, 98))),   # dark grey-brown
-                (0.3, srgb((154, 146, 136))),  # mid grey
-                (0.62, srgb((176, 170, 160))), # light grey
-                (0.86, srgb((146, 128, 106))), # brownish
-                (1.0, srgb((186, 164, 120))),  # fresh replacement, straw-tan
+                (0.0, srgb((100, 92, 84))),    # dark grey-brown
+                (0.3, srgb((136, 129, 120))),  # mid grey
+                (0.62, srgb((158, 153, 144))), # light grey
+                (0.86, srgb((128, 112, 92))),  # brownish
+                (1.0, srgb((176, 152, 108))),  # fresh replacement, straw-tan
             ]
         base = N.ramp(rnd, stops)
         # Vertex colour from the generator: node lines, scorch, wet underside, cut ends.
@@ -215,7 +227,7 @@ class Shaders:
         wr = N.img(self.A("rough_wood_rough_2k"), uvw, non_color=True)
         wbw = N.new("ShaderNodeRGBToBW")
         N.link(wd.outputs["Color"], wbw.inputs["Color"])
-        detail = N.maprange(wbw.outputs["Val"], 0.05, 0.4, 0.7, 1.2)
+        detail = N.maprange(wbw.outputs["Val"], 0.05, 0.4, 0.55, 1.28)
         dc = N.new("ShaderNodeCombineColor")
         for i in range(3):
             N.link(detail, dc.inputs[i])
@@ -227,6 +239,13 @@ class Shaders:
         for i in range(3):
             N.link(fbv, fbc.inputs[i])
         base = N.mix(1.0, base, fbc.outputs[0], "MULTIPLY")
+        # Mid-scale streaks a few mm wide that read from a couple of metres away.
+        ms = N.noise(N.uv_scaled(16.0, 0.6), 2.2, 5.0, 0.6)
+        msv = N.maprange(ms.outputs["Fac"], 0.32, 0.68, 0.72, 1.2)
+        msc = N.new("ShaderNodeCombineColor")
+        for i in range(3):
+            N.link(msv, msc.inputs[i])
+        base = N.mix(1.0, base, msc.outputs[0], "MULTIPLY")
         # Blue-black mildew blotches, elongated along the culm (as in the close-up photos).
         st = N.noise(N.uv_scaled(3.0, 0.9), 2.5, 6.0, 0.62)
         stm = N.maprange(st.outputs["Fac"], 0.5, 0.64, 0.0, 0.85)
@@ -257,6 +276,7 @@ class Shaders:
         spk = N.math("MULTIPLY", spm, spg)
         spk = N.math("MULTIPLY", spk, up)
         base = N.mix(spk, base, srgb((205, 204, 196)), "MIX")
+        base = ao_grime(N, base, 0.06, 0.5)
         N.link(base, bsdf.inputs["Base Color"])
         # Roughness: weathered skin is matte, with a little silica sheen left.
         rr = N.maprange(wr.outputs["Color"], 0.0, 1.0, 0.5, 0.85)
@@ -265,8 +285,8 @@ class Shaders:
         # Fine splits along the culm.
         sl = N.noise(N.uv_scaled(70.0, 0.25), 2.0, 2.0, 0.5)
         slm = N.maprange(sl.outputs["Fac"], 0.66, 0.7, 0.0, 1.0)
-        nrm = N.normal_map(wn.outputs["Color"], 0.9)
-        nrm = N.bump(slm, 0.5, 0.0015, nrm)
+        nrm = N.normal_map(wn.outputs["Color"], 1.3)
+        nrm = N.bump(slm, 0.7, 0.0015, nrm)
         N.link(nrm, bsdf.inputs["Normal"])
         N.link(bsdf.outputs[0], out.inputs["Surface"])
 
@@ -304,6 +324,7 @@ class Shaders:
         for i in range(3):
             N.link(var, vc.inputs[i])
         col = N.mix(1.0, col, vc.outputs[0], "MULTIPLY")
+        col = ao_grime(N, col, 0.05, 0.5)
         N.link(col, bsdf.inputs["Base Color"])
         rr = N.maprange(r.outputs["Color"], 0.0, 1.0, 0.45 if smooth else 0.6, 0.75 if smooth else 0.95)
         N.link(rr, bsdf.inputs["Roughness"])
@@ -322,8 +343,8 @@ class Shaders:
             (0.0, srgb((150, 144, 132))),
             (0.45, srgb((176, 170, 156))),
             (0.8, srgb((160, 150, 128))),
-            (0.9, srgb((190, 160, 104))),   # fresh replacement
-            (1.0, srgb((200, 168, 108))),
+            (0.9, srgb((178, 160, 124))),   # fresher replacement
+            (1.0, srgb((186, 166, 128))),
         ])
         # Lengthwise fibres and grime (v runs along the strip in metres, u across).
         fib = N.noise(N.uv_scaled(30.0, 6.0), 4.0, 6.0, 0.7)
@@ -342,6 +363,7 @@ class Shaders:
         per = N.math("PINGPONG", N.math("ADD", sep.outputs["Y"], N.math("MULTIPLY", rnd, 0.3)), 0.13)
         node = N.maprange(per, 0.0, 0.006, 1.0, 0.0)
         base = N.mix(N.math("MULTIPLY", node, 0.5), base, srgb((90, 78, 60)), "MIX")
+        base = ao_grime(N, base, 0.02, 0.6)
         N.link(base, bsdf.inputs["Base Color"])
         rgh = N.maprange(fib.outputs["Fac"], 0.3, 0.7, 0.4, 0.62)
         N.link(rgh, bsdf.inputs["Roughness"])
@@ -370,73 +392,43 @@ class Shaders:
         N.link(N.bump(fib.outputs["Fac"], 0.4, 0.0004), bsdf.inputs["Normal"])
         N.link(bsdf.outputs[0], out.inputs["Surface"])
 
-    # Woven sea-hibiscus bark sail: coarse basket weave, tan-brown with pale flecks.
+    # Woven sea-hibiscus bark sail. In the rigged photos the mat reads as rows
+    # of small rectangular blocks (the over-under of wide bark strips), tan
+    # with darker and paler blocks, fibrous, with small light gaps.
     def sail(self, mat):
+        # Woven bark strips in 2/2 twill: an image tile made by make_weave.py
+        # (1 m square, UVs are in metres), weathered by large-scale noise.
         N = Nodes(mat)
         out = N.new("ShaderNodeOutputMaterial")
         bsdf = N.new("ShaderNodeBsdfPrincipled")
-        # Basket weave in UV metres: strips 5 cm wide, pairs over-under.
-        tc = N.new("ShaderNodeTexCoord")
-        sep = N.new("ShaderNodeSeparateXYZ")
-        N.link(tc.outputs["UV"], sep.inputs["Vector"])
-        p = 0.045
-        X = N.math("DIVIDE", sep.outputs["X"], p)
-        Y = N.math("DIVIDE", sep.outputs["Y"], p)
-        ix = N.math("FLOOR", X)
-        iy = N.math("FLOOR", Y)
-        fx = N.math("FRACT", X)
-        fy = N.math("FRACT", Y)
-        chk = N.math("MODULO", N.math("ADD", N.math("FLOOR", N.math("DIVIDE", ix, 1)), N.math("FLOOR", N.math("DIVIDE", iy, 1))), 2.0)
-        # Profile across each strip (raised middle).
-        px = N.math("SINE", N.math("MULTIPLY", fx, math.pi))
-        py = N.math("SINE", N.math("MULTIPLY", fy, math.pi))
-        top_h = N.mix(chk, py, px)  # float mix via color
-        bw = N.new("ShaderNodeRGBToBW")
-        N.link(top_h, bw.inputs["Color"])
-        height = bw.outputs["Val"]
-        # Per-strip colour: hash of the strip index.
-        wn = N.new("ShaderNodeTexWhiteNoise", noise_dimensions="1D")
-        idx = N.mix(chk, iy, ix)
-        ibw = N.new("ShaderNodeRGBToBW")
-        N.link(idx, ibw.inputs["Color"])
-        N.link(ibw.outputs["Val"], wn.inputs["W"])
-        stripc = N.ramp(wn.outputs["Value"], [
-            (0.0, srgb((150, 112, 76))),
-            (0.5, srgb((170, 132, 94))),
-            (1.0, srgb((196, 160, 120))),
-        ])
-        fib = N.noise(N.obj(), 60.0, 6.0, 0.7)
-        fv = N.maprange(fib.outputs["Fac"], 0.3, 0.7, 0.7, 1.15)
-        fc = N.new("ShaderNodeCombineColor")
-        for i in range(3):
-            N.link(fv, fc.inputs[i])
-        col = N.mix(1.0, stripc, fc.outputs[0], "MULTIPLY")
-        edge = N.maprange(height, 0.0, 0.5, 0.45, 1.0)
-        ec = N.new("ShaderNodeCombineColor")
-        for i in range(3):
-            N.link(edge, ec.inputs[i])
-        col = N.mix(1.0, col, ec.outputs[0], "MULTIPLY")
-        mot = N.noise(N.obj(), 5.0, 5.0, 0.6)
-        motm = N.maprange(mot.outputs["Fac"], 0.5, 0.68, 0.0, 0.5)
-        col = N.mix(motm, col, srgb((92, 66, 44)), "MIX")
-        fl = N.noise(N.obj(), 40.0, 3.0, 0.5)
-        flm = N.maprange(fl.outputs["Fac"], 0.62, 0.7, 0.0, 0.45)
-        col = N.mix(flm, col, srgb((214, 196, 166)), "MIX")
-        big = N.noise(N.obj(), 0.8, 3.0, 0.5)
-        bv = N.maprange(big.outputs["Fac"], 0.3, 0.7, 0.8, 1.1)
+        vec = N.uv_scaled(1.0, 1.0)
+        diff = N.img(self.G("sail_weave_diff"), vec)
+        hgt = N.img(self.G("sail_weave_height"), vec, non_color=True)
+        alp = N.img(self.G("sail_weave_alpha"), vec, non_color=True)
+        col = diff.outputs["Color"]
+        # Broad stains and sun fading, like the photos: darker brown patches
+        # and paler bleached areas, streaking down the cloth.
+        st = N.noise(N.uv_scaled(0.9, 0.35), 1.0, 5.0, 0.6)
+        stm = N.maprange(st.outputs["Fac"], 0.5, 0.72, 0.0, 0.45)
+        col = N.mix(stm, col, srgb((92, 66, 44)), "MULTIPLY")
+        bl = N.noise(N.obj(), 0.8, 4.0, 0.55)
+        blm = N.maprange(bl.outputs["Fac"], 0.48, 0.68, 0.0, 0.3)
+        col = N.mix(blm, col, srgb((214, 196, 166)), "MIX")
+        big = N.noise(N.obj(), 0.35, 2.0, 0.5)
+        bv = N.maprange(big.outputs["Fac"], 0.3, 0.7, 0.88, 1.1)
         bc = N.new("ShaderNodeCombineColor")
         for i in range(3):
             N.link(bv, bc.inputs[i])
         col = N.mix(1.0, col, bc.outputs[0], "MULTIPLY")
         N.link(col, bsdf.inputs["Base Color"])
-        bsdf.inputs["Roughness"].default_value = 0.92
-        bsdf.inputs["Sheen Weight"].default_value = 0.2
-        h2 = N.math("ADD", height, N.math("MULTIPLY", fib.outputs["Fac"], 0.4))
-        N.link(N.bump(h2, 0.8, 0.004), bsdf.inputs["Normal"])
+        N.link(alp.outputs["Color"], bsdf.inputs["Alpha"])
+        bsdf.inputs["Roughness"].default_value = 0.9
+        bsdf.inputs["Sheen Weight"].default_value = 0.3
+        N.link(N.bump(hgt.outputs["Color"], 0.8, 0.004), bsdf.inputs["Normal"])
         tr = N.new("ShaderNodeBsdfTranslucent")
         N.link(col, tr.inputs["Color"])
         mixs = N.new("ShaderNodeMixShader")
-        mixs.inputs["Fac"].default_value = 0.15
+        mixs.inputs["Fac"].default_value = 0.25
         N.link(bsdf.outputs[0], mixs.inputs[1])
         N.link(tr.outputs[0], mixs.inputs[2])
         N.link(mixs.outputs[0], out.inputs["Surface"])
@@ -621,9 +613,12 @@ def ocean_surface(size=400.0):
     mod.spatial_size = 50
     mod.repeat_x = 6
     mod.repeat_y = 6
-    mod.wave_scale = 0.55
-    mod.choppiness = 1.1
-    mod.wind_velocity = 7
+    mod.wave_scale = 0.75
+    mod.choppiness = 1.5
+    mod.wind_velocity = 10
+    mod.use_foam = True
+    mod.foam_layer_name = "foam"
+    mod.foam_coverage = 0.25
     mod.wave_alignment = 0.4
     mod.wave_direction = 0.6
     mod.time = 4.0
@@ -639,15 +634,29 @@ def ocean_surface(size=400.0):
     out = N.new("ShaderNodeOutputMaterial")
     b = N.new("ShaderNodeBsdfPrincipled")
     b.inputs["Base Color"].default_value = (0.01, 0.05, 0.06, 1)
-    b.inputs["Roughness"].default_value = 0.04
+    b.inputs["Roughness"].default_value = 0.07
+    # Whitecaps from the ocean modifier's foam layer.
+    fa = N.new("ShaderNodeAttribute", attribute_name="foam")
+    fn = N.noise(N.obj(), 6.0, 6.0, 0.6)
+    fm = N.math("MULTIPLY", N.maprange(fa.outputs["Fac"], 0.2, 0.9, 0.0, 1.0), N.maprange(fn.outputs["Fac"], 0.4, 0.65, 0.0, 1.0))
+    foam = N.new("ShaderNodeBsdfDiffuse")
+    foam.inputs["Color"].default_value = (0.8, 0.82, 0.82, 1)
+    fmix = N.new("ShaderNodeMixShader")
+    N.link(fm, fmix.inputs["Fac"])
     b.inputs["IOR"].default_value = 1.333
     b.inputs["Transmission Weight"].default_value = 1.0
     rip = N.noise(N.obj(), 1.4, 10.0, 0.6)
-    N.link(N.bump(rip.outputs["Fac"], 0.12, 0.05), b.inputs["Normal"])
+    rip2 = N.noise(N.obj(), 9.0, 6.0, 0.6)
+    rip3 = N.noise(N.obj(), 0.25, 4.0, 0.55)
+    rh = N.math("ADD", rip.outputs["Fac"], N.math("MULTIPLY", rip2.outputs["Fac"], 0.3))
+    rh = N.math("ADD", rh, N.math("MULTIPLY", rip3.outputs["Fac"], 1.5))
+    N.link(N.bump(rh, 0.5, 0.06), b.inputs["Normal"])
     vol = N.new("ShaderNodeVolumeAbsorption")
     vol.inputs["Color"].default_value = (0.25, 0.6, 0.6, 1)
     vol.inputs["Density"].default_value = 0.9
-    N.link(b.outputs[0], out.inputs["Surface"])
+    N.link(b.outputs[0], fmix.inputs[1])
+    N.link(foam.outputs[0], fmix.inputs[2])
+    N.link(fmix.outputs[0], out.inputs["Surface"])
     N.link(vol.outputs[0], out.inputs["Volume"])
     ocean.data.materials.append(water)
     far.data.materials.append(water)
@@ -689,6 +698,19 @@ def main():
         # Hull bottom resting on (and pressed a little into) the sand.
         hull_z = min(zs)
         rig.location.z -= hull_z + 0.025
+    else:
+        # Afloat: a loaded bamboo raft swims low, culms about two-thirds under.
+        bz = []
+        for o in meshes:
+            if not any(ms.material and ms.material.name.split(".")[0] == "bamboo" for ms in o.material_slots):
+                continue
+            mw = o.matrix_world
+            vs = o.data.vertices
+            for k in range(0, len(vs), max(1, len(vs) // 400)):
+                bz.append((mw @ vs[k].co).z)
+        rig.location.z -= (min(bz) if bz else min(zs)) + 0.105
+        # A little heel to leeward and bow-down trim under sail.
+        rig.rotation_euler = (math.radians(1.6), math.radians(0.6), rig.rotation_euler[2])
     bpy.context.view_layer.update()
 
     for m in list(bpy.data.materials):
@@ -794,7 +816,7 @@ def camera_views(set_name, rig):
     z0 = 0.0 if set_name == "beach" else 0.0
     return {
         # Three-quarter view from off the port bow, eye height.
-        "hero": {"pos": (7.6, 6.4, 1.55), "target": (-0.3, 0.0, 2.3), "lens": 24},
+        "hero": {"sun": 25, "pos": (5.4, 6.0, 1.0), "target": (-0.8, 0.0, 2.6), "lens": 20},
         "side": {"pos": (0.0, 15.0, 1.6), "target": (0.0, 0.0, 2.6), "lens": 28},
         # Matches the rigged car-park photo: low, near the port quarter, bow to the left.
         "photo_side": {"pos": (1.2, 10.5, 1.2), "target": (0.4, 0.0, 3.0), "lens": 22},
@@ -802,13 +824,19 @@ def camera_views(set_name, rig):
         "photo_bow": {"pos": (9.0, -6.5, 1.5), "target": (-0.5, 0.0, 3.2), "lens": 26},
         "stern3q": {"pos": (-9.0, -7.5, 1.7), "target": (0.0, 0.0, 2.0), "lens": 30},
         "bow": {"pos": (6.4, 2.2, 0.9), "target": (3.6, 0.2, 0.45), "lens": 35, "dof": True, "fstop": 4.0},
-        "oarpost": {"pos": (-2.2, 2.6, 1.25), "target": (-3.2, 0.95, 0.55), "lens": 40, "dof": True, "fstop": 3.5},
+        "oarpost": {"pos": (-1.6, 2.4, 1.5), "target": (-3.1, 0.8, 0.5), "lens": 32, "dof": True, "fstop": 5.6, "sun": 60},
+        # Looking down on a post from inboard, like reference photo 23.
+        "oarpost_top": {"pos": (-2.6, -0.1, 1.9), "target": (-3.2, 0.75, 0.45), "lens": 30, "dof": True, "fstop": 5.6, "sun": 60},
         "rattan": {"pos": (-1.0, 1.55, 0.75), "target": (-1.5, 0.95, 0.38), "lens": 50, "dof": True, "fstop": 2.8, "sun": 80},
         "keel": {"pos": (-1.0, -2.6, 0.45), "target": (-2.8, -0.95, 0.2), "lens": 35, "dof": True, "fstop": 4.0, "sun": -100},
         "sailclose": {"pos": (2.5, 6.0, 2.6), "target": (-0.8, 0.0, 3.2), "lens": 35},
         # Matches reference photo 3: standing on the stern, looking forward along the deck.
         "deck": {"pos": (-5.4, -0.5, 1.75), "target": (2.0, 0.1, 0.35), "lens": 24, "sun": 150},
         "top": {"pos": (0.0, 0.01, 16.0), "target": (0.0, 0.0, 0.0), "lens": 35},
+        # Afloat: low over the water off the port bow, and a longer lens from abeam.
+        "sea_hero": {"pos": (-9.5, 10.0, 1.0), "target": (0.3, 0.0, 2.6), "lens": 28, "sun": 150},
+        "sea_abeam": {"pos": (-2.0, 22.0, 1.4), "target": (0.0, 0.0, 2.8), "lens": 45, "sun": 70},
+        "sea_stern": {"pos": (-12.0, -7.0, 1.1), "target": (0.0, 0.0, 2.4), "lens": 32, "sun": -60},
     }
 
 
