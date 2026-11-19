@@ -82,7 +82,9 @@ export function rattanMaps(seed = 2): SurfaceMaps {
   const map = paint(64, 512, (u, v) => {
     const g = fbm(u, v, 24, 3, 3, seed);
     const edge = Math.pow(Math.abs(u - 0.5) * 2, 6);
-    const k = 0.85 + 0.25 * g - 0.25 * edge;
+    // A rattan node: a faint darker ring across the strip once per tile.
+    const node = Math.exp(-(((v - 0.5) / 0.012) ** 2));
+    const k = (0.85 + 0.25 * g - 0.25 * edge) * (1 - 0.35 * node);
     return [k, k * 0.93, k * 0.72];
   }, SRGBColorSpace);
   const bump = paint(64, 512, (u, v) => {

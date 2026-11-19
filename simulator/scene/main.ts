@@ -94,6 +94,9 @@ const views: Record<string, { pos: [number, number, number]; target: [number, nu
   deck: { pos: [-5.6, 2.3, 0.4], target: [2, 1.4, 0] },
   lashing: { pos: [-3.4, 0.95, 1.5], target: [-4.0, 0.25, 0.35] },
   rattan: { pos: [-4.45, 0.62, 0.62], target: [-4.95, 0.22, 0.2] },
+  stern: { pos: [-8.2, 0.55, 1.6], target: [-5.2, 0.05, 0] },
+  ends: { pos: [-7.4, 0.8, 0.5], target: [-5.5, 0.05, 0] },
+  top: { pos: [-1.5, 9, 0.01], target: [-1.5, 0, 0] },
   sail: { pos: [-9, 3.5, -9], target: [0.6, 3.6, 0] },
   beach: { pos: [-8, 1.7, -24], target: [0, 3, 0] },
   aerial: { pos: [-16, 14, 18], target: [0, 1, 0] },
@@ -144,6 +147,12 @@ function buildPanel(): void {
   h.add(spec.hull.bow, "tip_rise_mm", 0, 2500, 25).name("bow rise").onFinishChange(re);
   h.add(spec.hull.bow, "tuck", 0, 0.6, 0.01).name("bow tuck").onFinishChange(re);
   h.add(spec.hull.bow, "outer_extra_rise", 0, 0.8, 0.01).name("bow cup").onFinishChange(re);
+  h.add(spec.hull, "diameter_spread", 1, 2.5, 0.05).name("girth spread").onFinishChange(re);
+  h.add(spec.hull, "largest", ["outside", "centre"]).name("biggest culms").onChange(re);
+  h.add(spec.hull, "crookedness", 0, 1.5, 0.05).onFinishChange(re);
+  h.add(spec.hull, "gap_jitter_mm", 0, 40, 1).name("gap jitter (mm)").onFinishChange(re);
+  h.add(spec.hull, "ovality", 0, 0.15, 0.01).onFinishChange(re);
+  h.add(spec.hull, "cracks", 0, 1, 0.05).name("end splits").onFinishChange(re);
   h.add(spec.hull, "irregularity", 0, 1, 0.05).onFinishChange(re);
   h.add(spec.hull, "scorch", 0, 1, 0.05).name("fire scorch").onFinishChange(re);
   h.add(spec, "seed", 1, 99, 1).onFinishChange(re);
@@ -257,7 +266,7 @@ if (STILL) {
 }
 
 // Handy for poking at the scene from the console.
-(window as unknown as Record<string, unknown>).raft = { get spec() { return spec; }, rebuild, setView, camera, controls, scene, Vector3 };
+(window as unknown as Record<string, unknown>).raft = { get spec() { return spec; }, get build() { return current; }, rebuild, setView, camera, controls, scene, Vector3 };
 
 // ---------------------------------------------------------------- export for offline rendering
 // `exportForBlender()` returns the raft as binary glTF (metres, y up, already at

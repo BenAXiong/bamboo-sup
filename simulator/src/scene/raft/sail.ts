@@ -154,7 +154,7 @@ export function buildSail(
       // Battens sit on the windward face of the cloth.
       pts.push({ p: toWorld(uu, hh, sp.w - r * 0.8), r: r * (1 - 0.25 * i / seg) });
     }
-    spars.push(sweepTube(pts, { radial: 10, uOffset: rand(), tint: SPAR_TINT }));
+    spars.push(sweepTube(pts, { radial: 10, uOffset: rand(), tint: SPAR_TINT, caps: "culm" }));
     const p0 = pts[0]!.p;
     const p1 = pts[pts.length - 1]!.p;
     const axis = new Vector3().subVectors(p1, p0).normalize();

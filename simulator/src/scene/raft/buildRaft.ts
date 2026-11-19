@@ -27,18 +27,11 @@ import {
   riggedRope,
   ROPE_R,
 } from "./detail.js";
+import { buildHull, type CulmPath } from "./hull.js";
 import { buildSail } from "./sail.js";
 import { straight, sweepTube, type TubePoint } from "./tube.js";
 
-export interface CulmPath {
-  id: string;
-  /** Samples along the culm, stern to bow. */
-  pts: Vector3[];
-  r: number[];
-  /** Arc length of each sample from the stern end. */
-  s: number[];
-  length: number;
-}
+export type { CulmPath } from "./hull.js";
 
 export interface RaftBuild {
   group: Group;
@@ -56,9 +49,6 @@ export interface RaftBuild {
 
 type RGB = [number, number, number];
 
-const SAMPLE_STEP_MM = 40;
-/** Extra samples round each node (mm along the culm) so the ridge has real geometry. */
-const NODE_OFFSETS = [-60, -30, -16, -9, -5, -2.5, 0, 2.5, 5, 9, 16, 30, 60];
 
 export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   const group = new Group();
@@ -70,167 +60,20 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   // ---------------------------------------------------------------- hull culms
   const N = Math.max(1, Math.round(H.culm_count));
   const half = (N - 1) / 2;
-  const kMax = Math.max(half, 1);
-
-  // Biggest culms in the middle, smaller toward the sides.
-  const baseD: number[] = [];
-  for (let i = 0; i < N; i++) {
-    const k = Math.abs(i - half) / kMax;
-    const jitter = 1 + signed(rand) * 0.06 * irr;
-    baseD.push(H.diameter_base_mm * (1 - H.edge_diameter_reduction * Math.pow(k, 1.4)) * jitter);
-  }
-  const taper = H.diameter_tip_mm / H.diameter_base_mm;
-
-  // Lateral centres at the butt end, packed outward from the centre culm.
-  const yBase: number[] = new Array(N).fill(0);
-  const mid = Math.floor(half);
-  if (N % 2 === 1) {
-    yBase[mid] = 0;
-  } else {
-    yBase[mid] = (baseD[mid]! + H.gap_mm) / 2;
-    yBase[mid + 1] = -(baseD[mid + 1]! + H.gap_mm) / 2;
-  }
-  const startPort = N % 2 === 1 ? mid : mid;
-  for (let i = startPort - 1; i >= 0; i--) {
-    yBase[i] = yBase[i + 1]! + (baseD[i + 1]! + baseD[i]!) / 2 + H.gap_mm;
-  }
-  const startStbd = N % 2 === 1 ? mid : mid + 1;
-  for (let i = startStbd + 1; i < N; i++) {
-    yBase[i] = yBase[i - 1]! - (baseD[i - 1]! + baseD[i]!) / 2 - H.gap_mm;
-  }
-
-  const rCentre = baseD[Math.round(half)]! / 2;
-  const hull: CulmPath[] = [];
-
-  for (let i = 0; i < N; i++) {
-    const kSigned = (i - half) / kMax;
-    const k = Math.abs(kSigned);
-    const xTail = rand() * H.stern_stagger_mm;
-    const L = H.length_mm - xTail * 0.6 + signed(rand) * 60 * irr;
-    const curve = Math.min(H.bow.curve_length_mm, L * 0.8);
-    const rise = Math.min(
-      H.bow.tip_rise_mm * (1 + H.bow.outer_extra_rise * k) * (1 + signed(rand) * 0.06 * irr),
-      curve * 0.95,
-    );
-    const bend = buildBend({
-      curve_start_from_bow_mm: curve,
-      tip_rise_mm: rise,
-      shape: H.bow.shape,
-      exponent: H.bow.exponent,
-    });
-    const straightLen = L - curve;
-    const rBase = baseD[i]! / 2;
-    // Bottoms roughly level at the stern: thinner culms sit with their axis lower.
-    const zAxis = rBase - rCentre;
-    const seed = spec.seed * 31 + i * 7;
-
-    // Nodes first: the sampling densifies round them so the ridge is real geometry.
-    const nodes: number[] = [];
-    {
-      let s = 120 + rand() * H.node_spacing_mm * 0.6;
-      while (s < L - 60) {
-        nodes.push(s);
-        const along = s / L;
-        // Internodes are shorter near the butt and the tip.
-        s += H.node_spacing_mm * (0.75 + 0.5 * Math.sin(Math.PI * along)) * (0.88 + 0.24 * rand());
-      }
+  // Rough x of each crossbeam, so the hull solve knows where lashings pull the bundle tight.
+  const C0 = spec.crossbeams;
+  const beamGuess: number[] = [];
+  {
+    const nb = Math.max(2, Math.round(C0.count));
+    const sL = H.length_mm - C0.last_from_bow_mm;
+    const straightLen = H.length_mm - H.bow.curve_length_mm;
+    for (let b = 0; b < nb; b++) {
+      const sB = C0.first_from_stern_mm + ((sL - C0.first_from_stern_mm) * b) / (nb - 1);
+      beamGuess.push(sB <= straightLen ? sB : straightLen + (sB - straightLen) * 0.85);
     }
-    const scarAngle = nodes.map((_, n) => (n % 2 === 0 ? 0 : Math.PI) + signed(rand) * 0.5);
-    const sSet: number[] = [];
-    const steps = Math.ceil(L / SAMPLE_STEP_MM);
-    for (let j = 0; j <= steps; j++) sSet.push((L * j) / steps);
-    for (const sn of nodes) for (const d of NODE_OFFSETS) sSet.push(sn + d);
-    const sList = [...new Set(sSet.filter((v) => v >= 0 && v <= L).map((v) => Math.round(v * 10) / 10))].sort((a, b) => a - b);
-    const nodeDist = (s: number) => {
-      let best = Infinity;
-      let idx = -1;
-      for (let n = 0; n < nodes.length; n++) {
-        const d = s - nodes[n]!;
-        if (Math.abs(d) < Math.abs(best)) {
-          best = d;
-          idx = n;
-        }
-      }
-      return { d: best, idx };
-    };
-
-    const pts: Vector3[] = [];
-    const rs: number[] = [];
-    const ss: number[] = [];
-    for (const s of sList) {
-      let x: number;
-      let z: number;
-      let f = 0; // 0 on the straight run, 1 at the bow tip
-      if (s <= straightLen) {
-        x = xTail + s;
-        z = zAxis;
-      } else {
-        const p = bend(s - straightLen);
-        x = xTail + straightLen + p.dx_mm;
-        z = zAxis + p.dz_mm;
-        f = (s - straightLen) / curve;
-      }
-      const taperHere = 1 + (taper - 1) * (s / L);
-      const nd = nodeDist(s).d;
-      // Node: a sharp ridge on a slight swelling.
-      const ridge = 1 + 0.028 * Math.exp(-((nd / 6) ** 2)) + 0.012 * Math.exp(-((nd / 45) ** 2));
-      const r = rBase * taperHere * (1 + 0.025 * irr * noise1(s / 900, seed + 3)) * ridge;
-      // Stay packed as the culms taper, and tuck the bow in toward the centreline.
-      const y =
-        yBase[i]! * (0.55 + 0.45 * taperHere) * (1 - H.bow.tuck * f * f) +
-        irr * 14 * noise1(s / 1700, seed + 5);
-      z += irr * 9 * noise1(s / 1300, seed + 9);
-      pts.push(new Vector3(x, y, z));
-      rs.push(r);
-      ss.push(s);
-    }
-    hull.push({ id: `C${i + 1}`, pts, r: rs, s: ss, length: L });
-
-    // Colour: weathered peeled bamboo, each culm a little different, fire-scorched over the bend.
-    const tone = 0.85 + 0.25 * rand();
-    const warm = rand();
-    const base: RGB = [0.3 * tone, (0.235 + 0.02 * warm) * tone, (0.155 + 0.015 * warm) * tone];
-    const tube: TubePoint[] = pts.map((p, j) => {
-      const s = ss[j]!;
-      let c: RGB = [...base];
-      const weather = 0.88 + 0.12 * noise1(s / 650, seed + 13);
-      const nodeLine = 1 - 0.45 * Math.exp(-((nodeDist(s).d / 3.5) ** 2)) - 0.12 * Math.exp(-((nodeDist(s).d / 25) ** 2));
-      c = [c[0] * weather * nodeLine, c[1] * weather * nodeLine, c[2] * weather * nodeLine];
-      const bendStart = L - curve;
-      if (s > bendStart - 200) {
-        const f = (s - bendStart) / curve;
-        const zone = smoothstep(-0.08, 0.2, f) * (1 - smoothstep(0.9, 1.0, f) * 0.4);
-        const patch = Math.min(1, 0.9 + 0.35 * noise1(s / 160, seed + 17));
-        const burn = H.scorch * zone * patch;
-        c = mix(c, [0.012, 0.009, 0.007], burn);
-      }
-      return { p, r: rs[j]!, color: c };
-    });
-    const geom = sweepTube(tube, {
-      radial: 18,
-      uOffset: rand(),
-      colorAround: (j, out) => {
-        // Underside wet and algae-stained; the top bleached a little by sun.
-        const down = Math.max(0, -out.z);
-        const up = Math.max(0, out.z);
-        let k = 1;
-        // Bud scar just above each node, alternating sides like the real culm.
-        const nd = nodeDist(ss[j]!);
-        if (nd.idx >= 0 && nd.d > 0 && nd.d < 26) {
-          const ang = Math.atan2(out.y, out.z);
-          let da = Math.abs(ang - scarAngle[nd.idx]!);
-          if (da > Math.PI) da = 2 * Math.PI - da;
-          if (da < 0.32) k = 0.55 + 0.45 * Math.min(1, da / 0.32 + Math.abs(nd.d - 12) / 16);
-        }
-        return [k * (1 - 0.45 * down + 0.08 * up), k * (1 - 0.38 * down + 0.08 * up), k * (1 - 0.42 * down + 0.06 * up)];
-      },
-    });
-    const mesh = new Mesh(geom, mats.bamboo);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    group.add(mesh);
-
   }
+  const { hull, rRef } = buildHull(spec, rand, mats, group, beamGuess);
+  const rCentre = rRef;
 
   // ------------------------------------------------------------- crossbeams
   const C = spec.crossbeams;
@@ -267,7 +110,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
       const xr = x + irr * 10 * noise1(y / 300, b * 13 + spec.seed);
       bp.push({ p: new Vector3(xr, y, zAt(y)), r: rb * (1 - 0.15 * (j / seg)), color: beamTone(rand) });
     }
-    const beam = new Mesh(sweepTube(bp, { radial: 12, uOffset: rand() }), mats.bamboo);
+    const beam = new Mesh(sweepTube(bp, { radial: 16, uOffset: rand(), caps: "culm" }), mats.bamboo);
     beam.castShadow = beam.receiveShadow = true;
     group.add(beam);
 
@@ -310,7 +153,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
           pts.push({ p: new Vector3(x, y, z), r, color: beamTone(rand) });
         }
         smoothZ(pts);
-        const m = new Mesh(sweepTube(pts, { radial: 14, uOffset: rand() }), mats.bamboo);
+        const m = new Mesh(sweepTube(pts, { radial: 14, uOffset: rand(), caps: "culm" }), mats.bamboo);
         m.castShadow = m.receiveShadow = true;
         group.add(m);
         for (const bm of beams) {
@@ -349,7 +192,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
             color: mix(beamTone(rand), [0.2, 0.22, 0.14], 0.35),
           });
         }
-        const m = new Mesh(sweepTube(pts, { radial: 12, uOffset: rand() }), mats.bamboo);
+        const m = new Mesh(sweepTube(pts, { radial: 12, uOffset: rand(), caps: "culm" }), mats.bamboo);
         m.castShadow = m.receiveShadow = true;
         group.add(m);
         for (const bm of beams) {
@@ -551,7 +394,8 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
 // ======================================================================= helpers
 
 function sampleAtS(c: CulmPath, s: number): { p: Vector3; r: number } {
-  const j = Math.max(0, Math.min(c.pts.length - 1, Math.round((s / c.length) * (c.pts.length - 1))));
+  let j = 0;
+  while (j < c.s.length - 1 && c.s[j + 1]! <= s) j++;
   return { p: c.pts[j]!, r: c.r[j]! };
 }
 

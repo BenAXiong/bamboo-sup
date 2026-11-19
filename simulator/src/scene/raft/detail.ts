@@ -76,8 +76,12 @@ export function sweepRibbon(
       p.clone().addScaledVector(bw, -hw).addScaledVector(nf, -ht),
       p.clone().addScaledVector(bw, hw).addScaledVector(nf, -ht),
     ];
-    const faces: [number, number, Vector3, number, number][] = [
-      [0, 1, nf, 1, 0], // top face, u from 1 to 0 across the strip
+    // The top face is the rattan's rounded skin: tilt its edge normals outward
+    // so it shades as a low dome rather than a flat plank.
+    const topA = nf.clone().multiplyScalar(0.8).addScaledVector(bw, 0.6).normalize();
+    const topB = nf.clone().multiplyScalar(0.8).addScaledVector(bw, -0.6).normalize();
+    const faces: [number, number, Vector3 | [Vector3, Vector3], number, number][] = [
+      [0, 1, [topA, topB], 1, 0], // top face, u from 1 to 0 across the strip
       [1, 2, bw.clone().negate(), 0, 0],
       [2, 3, nf.clone().negate(), 0, 1],
       [3, 0, bw, 1, 1],
@@ -86,8 +90,9 @@ export function sweepRibbon(
       for (const [k, ci, u] of [[0, a, ua], [1, bb, ub]] as [number, number, number][]) {
         const vi = i * 8 + f * 2 + k;
         const q = c[ci]!;
+        const nn = Array.isArray(fn) ? fn[k]! : fn;
         pos.set([q.x, q.y, q.z], vi * 3);
-        nor.set([fn.x, fn.y, fn.z], vi * 3);
+        nor.set([nn.x, nn.y, nn.z], vi * 3);
         uv.set([u, arc], vi * 2);
       }
     });

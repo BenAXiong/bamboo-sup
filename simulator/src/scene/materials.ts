@@ -15,6 +15,7 @@ export interface RaftMaterials {
   wood: MeshStandardMaterial;
   sail: MeshStandardMaterial;
   deck: MeshStandardMaterial;
+  crack: MeshStandardMaterial;
 }
 
 export function createRaftMaterials(): RaftMaterials {
@@ -80,6 +81,7 @@ export function createRaftMaterials(): RaftMaterials {
       bumpScale: 2,
       roughness: 0.85,
     }),
+    crack: new MeshStandardMaterial({ color: 0x0d0a07, roughness: 0.9 }),
   };
   // Names carry through glTF export, so the Blender scene can swap in its own shaders.
   for (const [name, m] of Object.entries(mats)) m.name = name;

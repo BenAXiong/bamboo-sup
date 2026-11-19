@@ -199,6 +199,10 @@ export function createEnvironment(scene: Scene, renderer: WebGLRenderer): Enviro
   const skyScene = new Scene();
   const skyForEnv = new Sky();
   skyForEnv.scale.setScalar(1000);
+  // The sun disc is far too bright for the half-float PMREM targets and turns
+  // the whole environment into NaN for some sun directions. Direct sunlight
+  // comes from the DirectionalLight anyway.
+  skyForEnv.material.uniforms["showSunDisc"]!.value = false;
   skyScene.add(skyForEnv);
   let envRT: WebGLRenderTarget | null = null;
 

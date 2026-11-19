@@ -21,10 +21,20 @@ export interface HullSpec {
   length_mm: number;
   diameter_base_mm: number;
   diameter_tip_mm: number;
-  /** Outer culms are this fraction thinner than the centre culm. */
-  edge_diameter_reduction: number;
-  /** Clear gap between neighbouring culms. Lashed rafts are packed tight. */
+  /** Largest butt / smallest butt across the culms. diameter_base_mm is the largest. */
+  diameter_spread: number;
+  /** Where the biggest culms go. Ben's rafts: outside. The IRA2 report: centre. */
+  largest: "outside" | "centre";
+  /** Clear gap between neighbouring culms at a lashing. */
   gap_mm: number;
+  /** Extra random gap per pair of culms, opening between the crossbeams. */
+  gap_jitter_mm: number;
+  /** 0 straight .. 1 very crooked: slow sweeps plus kinks at the nodes. Neighbours push each other aside. */
+  crookedness: number;
+  /** Cross-section out-of-roundness, as a fraction of radius. */
+  ovality: number;
+  /** Chance per culm end of a drying split running in from the cut. */
+  cracks: number;
   bow: {
     /** Arc length of culm consumed by the upward bend. */
     curve_length_mm: number;

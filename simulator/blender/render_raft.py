@@ -128,6 +128,8 @@ def shade_bamboo(mat, T, dark=1.0):
     if dark != 1.0:
         base = mul(N, base, (dark, dark, dark))
     base = saturate(N, base, 1.45)
+    # A little warmer than the viewer's tint: dried culms go straw to honey.
+    base = mul(N, base, (1.06, 0.99, 0.84))
     # Fibre streaks along the culm (v runs along it) and fine dark specks.
     uvc = N.new("ShaderNodeTexCoord")
     sc_ = N.new("ShaderNodeMapping")
@@ -148,8 +150,42 @@ def shade_bamboo(mat, T, dark=1.0):
     obj_coords(N, pores)
     rough = N.new("ShaderNodeMapRange", in_To_Min=0.38, in_To_Max=0.62)
     N.link(pores.outputs["Fac"], rough.inputs["Value"])
-    N.link(base, bsdf.inputs["Base Color"])
-    N.link(rough.outputs["Result"], bsdf.inputs["Roughness"])
+    # Sun-greyed weathering in broad patches, mostly on upward faces.
+    geo = N.new("ShaderNodeNewGeometry")
+    nz = N.new("ShaderNodeSeparateXYZ")
+    N.link(geo.outputs["Normal"], nz.inputs["Vector"])
+    patch = N.new("ShaderNodeTexNoise", in_Scale=1.6, in_Detail=6.0, in_Roughness=0.6)
+    obj_coords(N, patch)
+    wmask = N.new("ShaderNodeMapRange", in_From_Min=0.5, in_From_Max=0.68)
+    N.link(patch.outputs["Fac"], wmask.inputs["Value"])
+    wup = N.new("ShaderNodeMath", operation="MULTIPLY")
+    N.link(wmask.outputs["Result"], wup.inputs[0])
+    upm = N.new("ShaderNodeMapRange", in_From_Min=-0.2, in_From_Max=0.8, in_To_Min=0.2, in_To_Max=0.75)
+    N.link(nz.outputs["Z"], upm.inputs["Value"])
+    N.link(upm.outputs["Result"], wup.inputs[1])
+    grey = N.new("ShaderNodeMix", data_type="RGBA")
+    grey.inputs["B"].default_value = (0.2, 0.19, 0.17, 1)
+    N.link(wup.outputs[0], grey.inputs["Factor"])
+    N.link(base, grey.inputs["A"])
+    base = grey.outputs["Result"]
+    # Each culm a touch different in hue: some greener, some more golden.
+    oi = N.new("ShaderNodeObjectInfo")
+    hue = N.new("ShaderNodeMapRange", in_To_Min=0.47, in_To_Max=0.53)
+    N.link(oi.outputs["Random"], hue.inputs["Value"])
+    hs = N.new("ShaderNodeHueSaturation")
+    N.link(hue.outputs["Result"], hs.inputs["Hue"])
+    N.link(base, hs.inputs["Color"])
+    N.link(hs.outputs["Color"], bsdf.inputs["Base Color"])
+    # Wet near and below the waterline: darker and glossier.
+    wp = N.new("ShaderNodeSeparateXYZ")
+    N.link(geo.outputs["Position"], wp.inputs["Vector"])
+    wet = N.new("ShaderNodeMapRange", in_From_Min=0.06, in_From_Max=0.0)
+    N.link(wp.outputs["Z"], wet.inputs["Value"])
+    rmix = N.new("ShaderNodeMix", data_type="FLOAT")
+    N.link(wet.outputs["Result"], rmix.inputs["Factor"])
+    N.link(rough.outputs["Result"], rmix.inputs["A"])
+    rmix.inputs["B"].default_value = 0.12
+    N.link(rmix.outputs["Result"], bsdf.inputs["Roughness"])
     bsdf.inputs["Specular IOR Level"].default_value = 0.32
     bmp_img = tex(N, T("bamboo_bump"), non_color=True)
     b1 = N.new("ShaderNodeBump", in_Strength=0.35, in_Distance=0.0015)
@@ -181,8 +217,24 @@ def shade_rattan(mat, T):
     bsdf.inputs["Coat Roughness"].default_value = 0.25
     # Rattan skin is glossy with fine lengthwise ribs.
     ribs = N.new("ShaderNodeTexWave", wave_type="BANDS", bands_direction="X", in_Scale=60.0, in_Distortion=2.0, in_Detail=3.0)
-    bmp = N.new("ShaderNodeBump", in_Strength=0.25, in_Distance=0.0006)
-    N.link(ribs.outputs["Fac"], bmp.inputs["Height"])
+    # Rattan nodes: a slightly raised, darker band every ~20 cm along the strip (v is metres).
+    uvn = N.new("ShaderNodeTexCoord")
+    sep = N.new("ShaderNodeSeparateXYZ")
+    N.link(uvn.outputs["UV"], sep.inputs["Vector"])
+    per = N.new("ShaderNodeMath", operation="PINGPONG")
+    per.inputs[1].default_value = 0.11
+    N.link(sep.outputs["Y"], per.inputs[0])
+    node = N.new("ShaderNodeMapRange", in_From_Min=0.0, in_From_Max=0.006, in_To_Min=1.0, in_To_Max=0.0)
+    N.link(per.outputs[0], node.inputs["Value"])
+    dark = N.new("ShaderNodeMapRange", in_To_Min=1.0, in_To_Max=0.55)
+    N.link(node.outputs["Result"], dark.inputs["Value"])
+    base = mul(N, base, dark.outputs["Result"])
+    N.link(base, bsdf.inputs["Base Color"])
+    hsum = N.new("ShaderNodeMath", operation="ADD")
+    N.link(ribs.outputs["Fac"], hsum.inputs[0])
+    N.link(node.outputs["Result"], hsum.inputs[1])
+    bmp = N.new("ShaderNodeBump", in_Strength=0.3, in_Distance=0.0008)
+    N.link(hsum.outputs[0], bmp.inputs["Height"])
     N.link(bmp.outputs["Normal"], bsdf.inputs["Normal"])
     N.link(bsdf.outputs[0], out.inputs["Surface"])
 
@@ -199,6 +251,8 @@ def shade_rope(mat, T):
     bsdf.inputs["Roughness"].default_value = 0.85
     bsdf.inputs["Sheen Weight"].default_value = 0.25
     bsdf.inputs["Sheen Roughness"].default_value = 0.5
+    # Fuzz the colour of the fibre, not white: a white sheen turns thin rope grey.
+    bsdf.inputs["Sheen Tint"].default_value = (0.42, 0.3, 0.17, 1)
     bmp = N.new("ShaderNodeBump", in_Strength=0.6, in_Distance=0.0008)
     N.link(fib.outputs["Color"], bmp.inputs["Height"])
     N.link(bmp.outputs["Normal"], bsdf.inputs["Normal"])
@@ -475,6 +529,13 @@ def main():
             shade_rope(m, T)
         elif base == "sail":
             shade_sail(m, T)
+        elif base == "crack":
+            N = Nodes(m)
+            o = N.new("ShaderNodeOutputMaterial")
+            b = N.new("ShaderNodeBsdfPrincipled")
+            b.inputs["Base Color"].default_value = (0.01, 0.008, 0.006, 1)
+            b.inputs["Roughness"].default_value = 0.9
+            N.link(b.outputs[0], o.inputs["Surface"])
     for ob in bpy.data.objects:
         if ob.type == "MESH":
             for p in ob.data.polygons:

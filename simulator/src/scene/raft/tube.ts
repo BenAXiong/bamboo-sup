@@ -1,10 +1,11 @@
 /**
- * Sweep a circular section of varying radius along a 3D polyline.
+ * Sweep a closed section of varying radius along a 3D polyline.
  *
- * Used for every round member in the scene: culms, beams, mast, battens,
- * rattan and rope. UVs are u = around (0..1), v = arc length in metres, so
- * tiled textures keep a constant physical scale whatever the member length.
- * Optional per-point colour feeds vertex colours (scorch, weathering, tint).
+ * Used for every round member in the scene: culms, beams, mast, battens and
+ * rope strands. UVs are u = around (0..1), v = arc length in metres, so tiled
+ * textures keep a constant physical scale whatever the member length.
+ * Per-point colour and an optional facing-dependent multiplier feed vertex
+ * colours (scorch, weathering, wet waterline).
  */
 
 import { BufferAttribute, BufferGeometry, Vector3 } from "three";
@@ -18,16 +19,19 @@ export interface TubePoint {
 
 export interface TubeOptions {
   radial?: number;
-  caps?: boolean;
+  /**
+   * End treatment. true: flat discs. "culm": a cut bamboo end, showing the
+   * wall as a light ring and a recessed, darker diaphragm inside it.
+   */
+  caps?: boolean | "culm";
   /** Rotate the u seam so neighbouring members do not show their seams in line. */
   uOffset?: number;
   /** Units of the input points per metre, to get v in metres. Default 1000 (mm). */
   unitsPerMetre?: number;
-  /**
-   * Extra colour multiplier depending on which way the surface faces, e.g. to
-   * stain the underside of hull culms where they sit in the water.
-   */
-  colorAround?: (pointIndex: number, outward: Vector3) => [number, number, number];
+  /** Extra colour multiplier depending on facing and position (e.g. wet underside). */
+  colorAround?: (pointIndex: number, outward: Vector3, position: Vector3) => [number, number, number];
+  /** Radius multiplier round the section, e.g. for slightly oval culms. */
+  shape?: (pointIndex: number, theta: number) => number;
   /** Colour for points that do not carry their own. */
   tint?: [number, number, number];
 }
@@ -57,51 +61,42 @@ export function sweepTube(points: TubePoint[], options: TubeOptions = {}): Buffe
     normals.push(ref.clone());
   }
 
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const col: number[] = [];
+  const index: number[] = [];
+  const push = (p: Vector3, nn: Vector3, u: number, v: number, c: readonly number[]) => {
+    pos.push(p.x, p.y, p.z);
+    nor.push(nn.x, nn.y, nn.z);
+    uv.push(u, v);
+    col.push(c[0]!, c[1]!, c[2]!);
+    return pos.length / 3 - 1;
+  };
+
   const ringVerts = radial + 1; // duplicate seam vertex for clean UVs
-  const capVerts = caps ? 2 * (radial + 1) : 0;
-  const total = n * ringVerts + capVerts;
-  const pos = new Float32Array(total * 3);
-  const nor = new Float32Array(total * 3);
-  const uv = new Float32Array(total * 2);
-  const col = new Float32Array(total * 3);
+  const dirAt = (i: number, j: number) => {
+    const th = (j / radial) * Math.PI * 2;
+    const nrm = normals[i]!;
+    const bin = new Vector3().crossVectors(tangents[i]!, nrm);
+    return nrm.clone().multiplyScalar(Math.cos(th)).addScaledVector(bin, Math.sin(th));
+  };
+  const radiusAt = (i: number, j: number) =>
+    points[i]!.r * (options.shape ? options.shape(i, (j / radial) * Math.PI * 2) : 1);
 
   let arc = 0;
-  const tmp = new Vector3();
   for (let i = 0; i < n; i++) {
     const pt = points[i]!;
     if (i > 0) arc += pt.p.distanceTo(points[i - 1]!.p) / upm;
-    const t = tangents[i]!;
-    const nrm = normals[i]!;
-    const bin = new Vector3().crossVectors(t, nrm);
     const c = pt.color ?? options.tint ?? [1, 1, 1];
     for (let j = 0; j <= radial; j++) {
-      const th = (j / radial) * Math.PI * 2;
-      const cx = Math.cos(th);
-      const sx = Math.sin(th);
-      const dx = nrm.x * cx + bin.x * sx;
-      const dy = nrm.y * cx + bin.y * sx;
-      const dz = nrm.z * cx + bin.z * sx;
-      const k = i * ringVerts + j;
-      pos[k * 3] = pt.p.x + dx * pt.r;
-      pos[k * 3 + 1] = pt.p.y + dy * pt.r;
-      pos[k * 3 + 2] = pt.p.z + dz * pt.r;
-      nor[k * 3] = dx;
-      nor[k * 3 + 1] = dy;
-      nor[k * 3 + 2] = dz;
-      uv[k * 2] = j / radial + uOff;
-      uv[k * 2 + 1] = arc;
+      const d = dirAt(i, j);
+      const p = pt.p.clone().addScaledVector(d, radiusAt(i, j));
       let m: [number, number, number] = [1, 1, 1];
-      if (options.colorAround) {
-        tmp.set(dx, dy, dz);
-        m = options.colorAround(i, tmp);
-      }
-      col[k * 3] = c[0] * m[0];
-      col[k * 3 + 1] = c[1] * m[1];
-      col[k * 3 + 2] = c[2] * m[2];
+      if (options.colorAround) m = options.colorAround(i, d, p);
+      push(p, d, j / radial + uOff, arc, [c[0] * m[0], c[1] * m[1], c[2] * m[2]]);
     }
   }
-
-  const index: number[] = [];
   for (let i = 0; i < n - 1; i++) {
     for (let j = 0; j < radial; j++) {
       const a = i * ringVerts + j;
@@ -113,50 +108,70 @@ export function sweepTube(points: TubePoint[], options: TubeOptions = {}): Buffe
   }
 
   if (caps) {
-    // Cut ends: a darker disc, like the exposed wall and diaphragm of a culm.
     for (const end of [0, n - 1]) {
       const pt = points[end]!;
-      const t = tangents[end]!;
       const sign = end === 0 ? -1 : 1;
-      const base = n * ringVerts + (end === 0 ? 0 : radial + 1);
-      const nrm = normals[end]!;
-      const bin = new Vector3().crossVectors(t, nrm);
-      // centre
-      setV(base, pt.p, t.clone().multiplyScalar(sign), 0.5, 0.5, [0.45, 0.4, 0.33]);
-      for (let j = 0; j < radial; j++) {
-        const th = (j / radial) * Math.PI * 2;
-        const dir = nrm.clone().multiplyScalar(Math.cos(th)).add(bin.clone().multiplyScalar(Math.sin(th)));
-        const p = pt.p.clone().add(dir.multiplyScalar(pt.r * 0.999));
-        setV(base + 1 + j, p, t.clone().multiplyScalar(sign), 0.5 + 0.5 * Math.cos(th), 0.5 + 0.5 * Math.sin(th), [0.62, 0.55, 0.44]);
-      }
-      for (let j = 0; j < radial; j++) {
-        const a = base + 1 + j;
-        const b = base + 1 + ((j + 1) % radial);
-        if (sign > 0) index.push(base, a, b);
-        else index.push(base, b, a);
+      const out = tangents[end]!.clone().multiplyScalar(sign);
+      // Emit a triangle so that it faces `out` given ring order j increasing.
+      const tri = (a: number, b: number, c: number) => (sign > 0 ? index.push(a, b, c) : index.push(a, c, b));
+
+      if (caps === "culm") {
+        const wall = Math.min(0.22, 14 / pt.r); // wall thickness as a fraction of radius
+        const depth = pt.r * 0.35;
+        const ringC: readonly number[] = [0.62, 0.53, 0.38];
+        const innerC: readonly number[] = [0.3, 0.24, 0.16];
+        const diaC: readonly number[] = [0.2, 0.15, 0.1];
+        // Annulus: the cut wall.
+        const o0 = pos.length / 3;
+        for (let j = 0; j <= radial; j++) {
+          const d = dirAt(end, j);
+          const R = radiusAt(end, j);
+          push(pt.p.clone().addScaledVector(d, R), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), ringC);
+          push(pt.p.clone().addScaledVector(d, R * (1 - wall)), out, 0.5 + 0.4 * Math.cos((j / radial) * 6.283), 0.5 + 0.4 * Math.sin((j / radial) * 6.283), ringC);
+        }
+        for (let j = 0; j < radial; j++) {
+          const a = o0 + j * 2;
+          tri(a, a + 2, a + 1);
+          tri(a + 1, a + 2, a + 3);
+        }
+        // Inner wall down to the diaphragm.
+        const w0 = pos.length / 3;
+        for (let j = 0; j <= radial; j++) {
+          const d = dirAt(end, j);
+          const R = radiusAt(end, j) * (1 - wall);
+          const inward = d.clone().negate();
+          push(pt.p.clone().addScaledVector(d, R), inward, j / radial, 0, innerC);
+          push(pt.p.clone().addScaledVector(d, R).addScaledVector(out, -depth), inward, j / radial, depth / upm, diaC);
+        }
+        for (let j = 0; j < radial; j++) {
+          const a = w0 + j * 2;
+          tri(a, a + 2, a + 1);
+          tri(a + 1, a + 2, a + 3);
+        }
+        // Diaphragm.
+        const centre = pt.p.clone().addScaledVector(out, -depth);
+        const c0 = push(centre, out, 0.5, 0.5, diaC);
+        for (let j = 0; j <= radial; j++) {
+          const d = dirAt(end, j);
+          push(centre.clone().addScaledVector(d, radiusAt(end, j) * (1 - wall)), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), diaC);
+        }
+        for (let j = 0; j < radial; j++) tri(c0, c0 + 1 + j, c0 + 2 + j);
+      } else {
+        const c0 = push(pt.p, out, 0.5, 0.5, [0.45, 0.4, 0.33]);
+        for (let j = 0; j <= radial; j++) {
+          const d = dirAt(end, j);
+          push(pt.p.clone().addScaledVector(d, radiusAt(end, j) * 0.999), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), [0.62, 0.55, 0.44]);
+        }
+        for (let j = 0; j < radial; j++) tri(c0, c0 + 1 + j, c0 + 2 + j);
       }
     }
   }
 
-  function setV(k: number, p: Vector3, nn: Vector3, u: number, v: number, c: [number, number, number]) {
-    pos[k * 3] = p.x;
-    pos[k * 3 + 1] = p.y;
-    pos[k * 3 + 2] = p.z;
-    nor[k * 3] = nn.x;
-    nor[k * 3 + 1] = nn.y;
-    nor[k * 3 + 2] = nn.z;
-    uv[k * 2] = u;
-    uv[k * 2 + 1] = v;
-    col[k * 3] = c[0];
-    col[k * 3 + 1] = c[1];
-    col[k * 3 + 2] = c[2];
-  }
-
   const g = new BufferGeometry();
-  g.setAttribute("position", new BufferAttribute(pos, 3));
-  g.setAttribute("normal", new BufferAttribute(nor, 3));
-  g.setAttribute("uv", new BufferAttribute(uv, 2));
-  g.setAttribute("color", new BufferAttribute(col, 3));
+  g.setAttribute("position", new BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute("normal", new BufferAttribute(new Float32Array(nor), 3));
+  g.setAttribute("uv", new BufferAttribute(new Float32Array(uv), 2));
+  g.setAttribute("color", new BufferAttribute(new Float32Array(col), 3));
   g.setIndex(index);
   return g;
 }
