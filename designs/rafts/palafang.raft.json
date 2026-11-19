@@ -2,87 +2,111 @@
   "spec_version": 1,
   "id": "RAFT-PALAFANG-01",
   "name": "Palafang-style Amis sailing raft (visual reconstruction)",
-  "notes": "Visual estimate, NOT measured. Proportions taken from Ben's photo of the reconstructed sailing raft (woven sea-hibiscus bark sail, about ten battens, balanced-lug shape) and the Laway / IRA2 process report: tips forward, thickest culms in the middle, about one crossbeam per metre, three bow beams, yellow-rattan lashing, three keel members under each side (Palafang 2025). Replace with measured values when available. Hull girth (outer culms largest, about 1.6x spread) and crookedness follow Ben's direction.",
+  "notes": "Visual reconstruction of the Palafang raft from Ben's 30 photos (docs/reference/parafang/, 2026-09-23), the rigged photos and Ben's answers on the fact sheet (2026-11-19): about 9 m long, about 17 hull culms of mostly 8-12 cm with the outer culms biggest, a low bow rise of about 0.5 m, natural-pole crossbeams, a thin culm rail per side on the beam ends, three keel culms per side stacked in a triangle at the stern with a slanted front cut, woven split-bamboo deck mats, four oar posts (hollowed log on the rail with two branches) with four oars, and a mast held by four stays to the corners. Dimensions are photo estimates.",
   "seed": 7,
   "hull": {
-    "culm_count": 9,
-    "length_mm": 11000,
-    "diameter_base_mm": 185,
-    "diameter_tip_mm": 105,
-    "diameter_spread": 1.6,
+    "culm_count": 17,
+    "length_mm": 9000,
+    "diameter_base_mm": 155,
+    "diameter_tip_mm": 118,
+    "diameter_spread": 2.2,
     "largest": "outside",
-    "gap_mm": 4,
-    "gap_jitter_mm": 10,
-    "crookedness": 0.6,
-    "ovality": 0.05,
-    "cracks": 0.35,
+    "gap_mm": 3,
+    "gap_jitter_mm": 8,
+    "crookedness": 0.55,
+    "ovality": 0.06,
+    "cracks": 0.45,
     "bow": {
-      "curve_length_mm": 3200,
-      "tip_rise_mm": 950,
+      "curve_length_mm": 2600,
+      "tip_rise_mm": 520,
       "shape": "power",
-      "exponent": 2.2,
-      "outer_extra_rise": 0.25,
-      "tuck": 0.28
+      "exponent": 2.0,
+      "outer_extra_rise": 0.12,
+      "tuck": 0.12
     },
-    "irregularity": 0.5,
-    "stern_stagger_mm": 220,
-    "node_spacing_mm": 380,
-    "scorch": 0.9
+    "irregularity": 0.55,
+    "stern_stagger_mm": 280,
+    "node_spacing_mm": 360,
+    "scorch": 0.35,
+    "bow_stagger_mm": 220
   },
   "crossbeams": {
-    "count": 10,
-    "first_from_stern_mm": 350,
-    "last_from_bow_mm": 650,
-    "diameter_mm": 75,
-    "overhang_mm": 160,
-    "wraps": 6
+    "count": 8,
+    "first_from_stern_mm": 300,
+    "last_from_bow_mm": 2600,
+    "diameter_mm": 78,
+    "overhang_mm": 55,
+    "wraps": 3,
+    "bow_bar": {
+      "from_tip_mm": 620,
+      "bulge_mm": 300,
+      "diameter_mm": 105
+    },
+    "second_bow_bar": {
+      "from_tip_mm": 1600,
+      "skew_mm": 180,
+      "diameter_mm": 80
+    }
   },
   "rails": {
     "enabled": true,
     "per_side": 1,
-    "diameter_mm": 115,
-    "length_fraction": 0.88
+    "diameter_mm": 72,
+    "length_fraction": 1.0
   },
   "keels": {
     "enabled": true,
     "per_side": 3,
-    "diameter_mm": 120,
-    "length_fraction": 0.5,
-    "centre_fraction": 0.42
+    "diameter_mm": 105,
+    "length_fraction": 0.4,
+    "centre_fraction": 0.2,
+    "stack": "triangle",
+    "front_slant": 1.4
   },
   "deck": {
-    "enabled": false,
-    "from_fraction": 0.12,
-    "to_fraction": 0.62
+    "enabled": true,
+    "from_fraction": 0.1,
+    "to_fraction": 0.8
   },
   "oar_posts": {
     "enabled": true,
-    "beams": [
-      2,
-      6
+    "stations_fraction": [
+      0.15,
+      0.68
     ],
-    "height_mm": 650,
-    "outward_tilt_deg": 15
+    "height_mm": 950,
+    "outward_tilt_deg": 10,
+    "log_length_mm": 460,
+    "log_diameter_mm": 190,
+    "splay_deg": 13,
+    "oars": {
+      "enabled": true,
+      "length_mm": 3400,
+      "blade_length_mm": 900,
+      "blade_width_mm": 190,
+      "shaft_diameter_mm": 45,
+      "elevation_deg": 21
+    }
   },
   "rig": {
     "enabled": true,
-    "mast_fraction": 0.56,
-    "mast_height_mm": 8000,
-    "mast_diameter_mm": 125,
+    "mast_fraction": 0.58,
+    "mast_height_mm": 7800,
+    "mast_diameter_mm": 115,
     "stays": true,
     "sail": {
       "enabled": true,
-      "luff_mm": 6300,
-      "foot_mm": 5000,
-      "head_mm": 2600,
-      "head_droop_deg": 14,
-      "roach_mm": 550,
+      "luff_mm": 5800,
+      "foot_mm": 3900,
+      "head_mm": 2200,
+      "head_droop_deg": 20,
+      "roach_mm": 280,
       "battens": 9,
-      "balance": 0.2,
-      "boom_height_mm": 450,
-      "camber": 0.05,
-      "panel_sag": 0.025,
-      "sheet_angle_deg": 18
+      "balance": 0.03,
+      "boom_height_mm": 550,
+      "camber": 0.025,
+      "panel_sag": 0.008,
+      "sheet_angle_deg": 8
     }
   },
   "scene": {

@@ -16,6 +16,18 @@ export interface RaftMaterials {
   sail: MeshStandardMaterial;
   deck: MeshStandardMaterial;
   crack: MeshStandardMaterial;
+  /** Natural poles and branches, bark gone: crossbeams, deck sticks, oar-post branches. */
+  branch: MeshStandardMaterial;
+  /** Hewn or hollowed hardwood: mast step, oar-post logs. */
+  log: MeshStandardMaterial;
+  /** Oars: smoothed wood. */
+  oar: MeshStandardMaterial;
+  /** Mast: smooth pale pole. */
+  mast: MeshStandardMaterial;
+  /** Side rails: the palest, most sun-bleached culms. */
+  rail: MeshStandardMaterial;
+  /** Keel culms: fresher, tan. */
+  keel: MeshStandardMaterial;
 }
 
 export function createRaftMaterials(): RaftMaterials {
@@ -82,6 +94,12 @@ export function createRaftMaterials(): RaftMaterials {
       roughness: 0.85,
     }),
     crack: new MeshStandardMaterial({ color: 0x0d0a07, roughness: 0.9 }),
+    branch: new MeshStandardMaterial({ map: bamboo.map, bumpMap: bamboo.bump, color: 0x6a6258, roughness: 0.85 }),
+    log: new MeshStandardMaterial({ map: bamboo.map, bumpMap: bamboo.bump, color: 0x5c564e, roughness: 0.85 }),
+    oar: new MeshStandardMaterial({ color: 0x7a6650, roughness: 0.7 }),
+    rail: new MeshStandardMaterial({ map: bamboo.map, bumpMap: bamboo.bump, color: 0xc8c0b0, roughness: 0.6 }),
+    keel: new MeshStandardMaterial({ map: bamboo.map, bumpMap: bamboo.bump, color: 0xb09a78, roughness: 0.6 }),
+    mast: new MeshStandardMaterial({ map: bamboo.map, bumpMap: bamboo.bump, color: 0xb0a490, roughness: 0.6 }),
   };
   // Names carry through glTF export, so the Blender scene can swap in its own shaders.
   for (const [name, m] of Object.entries(mats)) m.name = name;

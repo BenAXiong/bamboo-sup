@@ -118,8 +118,8 @@ export function sweepRibbon(
 
 // ------------------------------------------------------------------ rattan
 
-const STRIP_W = 9.5;
-const STRIP_T = 2.6;
+const STRIP_W = 8;
+const STRIP_T = 2.2;
 
 /**
  * Rattan lashing binding an upper member that sits on a lower one.
@@ -338,4 +338,129 @@ function resample(path: Vector3[], step: number): Vector3[] {
     for (let j = 1; j <= k; j++) out.push(a.clone().lerp(b, j / k));
   }
   return out;
+}
+
+/**
+ * Rattan wound round a bundle of parallel members (outer culm + rail + beam
+ * end, a culm and its keels, a log on the rail). The strip follows the convex
+ * hull of the members' sections and advances along the axis turn by turn,
+ * loosely, the way the strips are wound on the real raft.
+ */
+export function bundleRing(
+  circles: { c: Vector3; r: number }[],
+  axis: Vector3,
+  turns: number,
+  rand: () => number,
+  looseness = 1.5,
+): BufferGeometry {
+  const ax = axis.clone().normalize();
+  const { n, b } = memberBasis(ax);
+  const along0 = circles.reduce((s, q) => s + q.c.dot(ax), 0) / circles.length;
+  // Section points (2D in n,b), padded by half the strip thickness.
+  const raw: [number, number][] = [];
+  for (const q of circles) {
+    const cx = q.c.dot(n);
+    const cy = q.c.dot(b);
+    const rr = q.r + STRIP_T * 0.55;
+    for (let k = 0; k < 48; k++) {
+      const a = (k / 48) * Math.PI * 2;
+      raw.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a)]);
+    }
+  }
+  raw.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const cross = (o: [number, number], a: [number, number], c: [number, number]) =>
+    (a[0] - o[0]) * (c[1] - o[1]) - (a[1] - o[1]) * (c[0] - o[0]);
+  const lower: [number, number][] = [];
+  for (const p of raw) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: [number, number][] = [];
+  for (let i = raw.length - 1; i >= 0; i--) {
+    const p = raw[i]!;
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  const hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+  // Resample the hull uniformly by arc length.
+  const per: number[] = [0];
+  for (let i = 1; i <= hull.length; i++) {
+    const p = hull[i - 1]!;
+    const q = hull[i % hull.length]!;
+    per.push(per[i - 1]! + Math.hypot(q[0] - p[0], q[1] - p[1]));
+  }
+  const total = per[per.length - 1]!;
+  const M = Math.max(48, Math.ceil(total / 6));
+  const loop: { x: number; y: number; nx: number; ny: number }[] = [];
+  let seg = 0;
+  for (let k = 0; k < M; k++) {
+    const s = (k / M) * total;
+    while (per[seg + 1]! < s) seg++;
+    const p = hull[seg]!;
+    const q = hull[(seg + 1) % hull.length]!;
+    const t = (s - per[seg]!) / Math.max(1e-6, per[seg + 1]! - per[seg]!);
+    const ex = q[0] - p[0];
+    const ey = q[1] - p[1];
+    const el = Math.hypot(ex, ey) || 1;
+    // CCW hull: outward normal is (ey, -ex).
+    loop.push({ x: p[0] + ex * t, y: p[1] + ey * t, nx: ey / el, ny: -ex / el });
+  }
+  const pitch = STRIP_W * 1.12;
+  const pts: Vector3[] = [];
+  const norms: Vector3[] = [];
+  const w = Math.max(1, Math.round(turns));
+  const phase = rand() * M;
+  const jit = Array.from({ length: w + 2 }, () => (rand() - 0.5) * STRIP_W * 0.5);
+  for (let k = 0; k <= w * M; k++) {
+    const L = loop[(k + Math.floor(phase)) % M]!;
+    const turn = k / M;
+    const ti = Math.floor(turn);
+    const f = turn - ti;
+    const along = along0 + (turn - w / 2) * pitch + jit[ti]! * (1 - f) + jit[ti + 1]! * f;
+    const loose = looseness * (0.5 + 0.5 * Math.sin(turn * 5.1 + ti));
+    const x = L.x + L.nx * loose;
+    const y = L.y + L.ny * loose;
+    pts.push(n.clone().multiplyScalar(x).addScaledVector(b, y).addScaledVector(ax, along));
+    norms.push(n.clone().multiplyScalar(L.nx).addScaledVector(b, L.ny));
+  }
+  const parts = [sweepRibbon(pts, STRIP_W, STRIP_T, (i) => norms[i]!)];
+  // Frapping: a few cross turns round the strands in the gap between the
+  // first two members, cinching the ring tight (seen on the rail rings).
+  if (circles.length >= 2) {
+    const c0 = { x: circles[0]!.c.dot(n), y: circles[0]!.c.dot(b), r: circles[0]!.r };
+    const c1 = { x: circles[1]!.c.dot(n), y: circles[1]!.c.dot(b), r: circles[1]!.r };
+    const d = Math.hypot(c1.x - c0.x, c1.y - c0.y);
+    const gap = d - c0.r - c1.r;
+    if (gap > STRIP_W * 1.2) {
+      const ux = (c1.x - c0.x) / d;
+      const uy = (c1.y - c0.y) / d;
+      const vx = -uy;
+      const vy = ux;
+      const mx = c0.x + ux * (c0.r + gap / 2);
+      const my = c0.y + uy * (c0.r + gap / 2);
+      const lat = Math.min(c0.r, c1.r) * 0.85 + STRIP_T * 2;
+      const halfW = (w * pitch) / 2 + STRIP_T * 1.5;
+      const fr = 2 + Math.floor(rand() * 2);
+      const fp: Vector3[] = [];
+      const fn: Vector3[] = [];
+      const segs = 64;
+      for (let k = 0; k <= fr * segs; k++) {
+        const th = (k / segs) * Math.PI * 2;
+        const turn = k / segs;
+        // Rounded rectangle in (v, axis), squashed superellipse.
+        const cs = Math.cos(th);
+        const sn = Math.sin(th);
+        const e = 0.25;
+        const sx = Math.sign(cs) * Math.abs(cs) ** e;
+        const sy = Math.sign(sn) * Math.abs(sn) ** e;
+        const off = (turn - fr / 2) * STRIP_W * 1.05;
+        const px = mx + vx * sx * lat + ux * off;
+        const py = my + vy * sx * lat + uy * off;
+        fp.push(n.clone().multiplyScalar(px).addScaledVector(b, py).addScaledVector(ax, along0 + sy * halfW));
+        fn.push(n.clone().multiplyScalar(vx * cs).addScaledVector(b, vy * cs).addScaledVector(ax, sn).normalize());
+      }
+      parts.push(sweepRibbon(fp, STRIP_W * 0.9, STRIP_T, (i) => fn[i]!));
+    }
+  }
+  return mergeGeometries(parts)!;
 }

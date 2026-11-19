@@ -18,7 +18,7 @@ import type { SailSpec } from "../raftSpec.js";
 import type { Member } from "./detail.js";
 import { sweepTube } from "./tube.js";
 
-const SPAR_TINT: [number, number, number] = [0.22, 0.17, 0.11];
+const SPAR_TINT: [number, number, number] = [0.24, 0.22, 0.19];
 
 export interface SailBuild {
   group: Group;

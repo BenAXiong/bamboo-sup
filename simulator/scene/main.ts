@@ -139,7 +139,7 @@ function buildPanel(): void {
   gui.add(ui, "view", Object.keys(views)).name("camera").onChange(setView);
 
   const h = gui.addFolder("Hull");
-  h.add(spec.hull, "culm_count", 3, 17, 1).name("culms").onFinishChange(re);
+  h.add(spec.hull, "culm_count", 3, 25, 1).name("culms").onFinishChange(re);
   h.add(spec.hull, "length_mm", 4000, 14000, 100).name("length (mm)").onFinishChange(re);
   h.add(spec.hull, "diameter_base_mm", 80, 260, 5).name("butt Ø (mm)").onFinishChange(re);
   h.add(spec.hull, "diameter_tip_mm", 50, 200, 5).name("tip Ø (mm)").onFinishChange(re);

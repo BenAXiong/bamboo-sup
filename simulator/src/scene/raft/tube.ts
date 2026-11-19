@@ -34,6 +34,12 @@ export interface TubeOptions {
   shape?: (pointIndex: number, theta: number) => number;
   /** Colour for points that do not carry their own. */
   tint?: [number, number, number];
+  /**
+   * Cut the last end on a slant: each vertex of the end ring moves along the
+   * tangent by `k * radius * dot(direction, dir)`. dir = up and k > 0 makes the
+   * top stick out further than the bottom (a cut face looking down and forward).
+   */
+  slantEnd?: { dir: Vector3; k: number };
 }
 
 export function sweepTube(points: TubePoint[], options: TubeOptions = {}): BufferGeometry {
@@ -81,6 +87,10 @@ export function sweepTube(points: TubePoint[], options: TubeOptions = {}): Buffe
     const bin = new Vector3().crossVectors(tangents[i]!, nrm);
     return nrm.clone().multiplyScalar(Math.cos(th)).addScaledVector(bin, Math.sin(th));
   };
+  const slant = (i: number, d: Vector3, R: number): Vector3 => {
+    if (!options.slantEnd || i !== n - 1) return new Vector3();
+    return tangents[i]!.clone().multiplyScalar(options.slantEnd.k * R * d.dot(options.slantEnd.dir));
+  };
   const radiusAt = (i: number, j: number) =>
     points[i]!.r * (options.shape ? options.shape(i, (j / radial) * Math.PI * 2) : 1);
 
@@ -91,7 +101,7 @@ export function sweepTube(points: TubePoint[], options: TubeOptions = {}): Buffe
     const c = pt.color ?? options.tint ?? [1, 1, 1];
     for (let j = 0; j <= radial; j++) {
       const d = dirAt(i, j);
-      const p = pt.p.clone().addScaledVector(d, radiusAt(i, j));
+      const p = pt.p.clone().addScaledVector(d, radiusAt(i, j)).add(slant(i, d, radiusAt(i, j)));
       let m: [number, number, number] = [1, 1, 1];
       if (options.colorAround) m = options.colorAround(i, d, p);
       push(p, d, j / radial + uOff, arc, [c[0] * m[0], c[1] * m[1], c[2] * m[2]]);
@@ -118,7 +128,7 @@ export function sweepTube(points: TubePoint[], options: TubeOptions = {}): Buffe
       if (caps === "culm") {
         const wall = Math.min(0.22, 14 / pt.r); // wall thickness as a fraction of radius
         const depth = pt.r * 0.35;
-        const ringC: readonly number[] = [0.62, 0.53, 0.38];
+        const ringC: readonly number[] = [0.24, 0.21, 0.17];
         const innerC: readonly number[] = [0.3, 0.24, 0.16];
         const diaC: readonly number[] = [0.2, 0.15, 0.1];
         // Annulus: the cut wall.
@@ -126,8 +136,8 @@ export function sweepTube(points: TubePoint[], options: TubeOptions = {}): Buffe
         for (let j = 0; j <= radial; j++) {
           const d = dirAt(end, j);
           const R = radiusAt(end, j);
-          push(pt.p.clone().addScaledVector(d, R), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), ringC);
-          push(pt.p.clone().addScaledVector(d, R * (1 - wall)), out, 0.5 + 0.4 * Math.cos((j / radial) * 6.283), 0.5 + 0.4 * Math.sin((j / radial) * 6.283), ringC);
+          push(pt.p.clone().addScaledVector(d, R).add(slant(end, d, R)), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), ringC);
+          push(pt.p.clone().addScaledVector(d, R * (1 - wall)).add(slant(end, d, R * (1 - wall))), out, 0.5 + 0.4 * Math.cos((j / radial) * 6.283), 0.5 + 0.4 * Math.sin((j / radial) * 6.283), ringC);
         }
         for (let j = 0; j < radial; j++) {
           const a = o0 + j * 2;
@@ -140,8 +150,8 @@ export function sweepTube(points: TubePoint[], options: TubeOptions = {}): Buffe
           const d = dirAt(end, j);
           const R = radiusAt(end, j) * (1 - wall);
           const inward = d.clone().negate();
-          push(pt.p.clone().addScaledVector(d, R), inward, j / radial, 0, innerC);
-          push(pt.p.clone().addScaledVector(d, R).addScaledVector(out, -depth), inward, j / radial, depth / upm, diaC);
+          push(pt.p.clone().addScaledVector(d, R).add(slant(end, d, R)), inward, j / radial, 0, innerC);
+          push(pt.p.clone().addScaledVector(d, R).add(slant(end, d, R)).addScaledVector(out, -depth), inward, j / radial, depth / upm, diaC);
         }
         for (let j = 0; j < radial; j++) {
           const a = w0 + j * 2;
@@ -153,14 +163,14 @@ export function sweepTube(points: TubePoint[], options: TubeOptions = {}): Buffe
         const c0 = push(centre, out, 0.5, 0.5, diaC);
         for (let j = 0; j <= radial; j++) {
           const d = dirAt(end, j);
-          push(centre.clone().addScaledVector(d, radiusAt(end, j) * (1 - wall)), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), diaC);
+          push(centre.clone().addScaledVector(d, radiusAt(end, j) * (1 - wall)).add(slant(end, d, radiusAt(end, j) * (1 - wall))), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), diaC);
         }
         for (let j = 0; j < radial; j++) tri(c0, c0 + 1 + j, c0 + 2 + j);
       } else {
         const c0 = push(pt.p, out, 0.5, 0.5, [0.45, 0.4, 0.33]);
         for (let j = 0; j <= radial; j++) {
           const d = dirAt(end, j);
-          push(pt.p.clone().addScaledVector(d, radiusAt(end, j) * 0.999), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), [0.62, 0.55, 0.44]);
+          push(pt.p.clone().addScaledVector(d, radiusAt(end, j) * 0.999).add(slant(end, d, radiusAt(end, j))), out, 0.5 + 0.5 * Math.cos((j / radial) * 6.283), 0.5 + 0.5 * Math.sin((j / radial) * 6.283), [0.62, 0.55, 0.44]);
         }
         for (let j = 0; j < radial; j++) tri(c0, c0 + 1 + j, c0 + 2 + j);
       }

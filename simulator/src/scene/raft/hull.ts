@@ -119,7 +119,7 @@ export function buildHull(
   for (let i = 0; i < N; i++) {
     const k = Math.abs(i - half) / kMax;
     const xTail = rand() * H.stern_stagger_mm;
-    const L = H.length_mm - xTail * 0.6 + signed(rand) * 60 * irr;
+    const L = H.length_mm - xTail * 0.6 + signed(rand) * (H.bow_stagger_mm ?? 60) * irr;
     const curve = Math.min(H.bow.curve_length_mm, L * 0.8);
     const rise = Math.min(
       H.bow.tip_rise_mm * (1 + H.bow.outer_extra_rise * k) * (1 + signed(rand) * 0.06 * irr),
@@ -335,7 +335,8 @@ export function buildHull(
       let c: RGB = [...base];
       const weather = 0.88 + 0.12 * noise1(s / 650, P.seed + 13);
       const ndd = nodeDist(s).d;
-      const nodeLine = 1 - 0.45 * Math.exp(-((ndd / 3.5) ** 2)) - 0.12 * Math.exp(-((ndd / 25) ** 2));
+      // A dark line at the node itself, a paler band either side (the sheath scar).
+      const nodeLine = 1 - 0.55 * Math.exp(-((ndd / 3) ** 2)) + 0.16 * Math.exp(-((ndd / 16) ** 2)) - 0.08 * Math.exp(-((ndd / 60) ** 2));
       c = [c[0] * weather * nodeLine, c[1] * weather * nodeLine, c[2] * weather * nodeLine];
       if (s > bendStart - 200) {
         const f = (s - bendStart) / P.curve;

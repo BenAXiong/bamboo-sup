@@ -22,6 +22,7 @@ import {
   type Member,
   laidRope,
   memberBasis,
+  bundleRing,
   rattanLashing,
   rattanSeizing,
   riggedRope,
@@ -48,6 +49,18 @@ export interface RaftBuild {
 }
 
 type RGB = [number, number, number];
+
+/** A pole laid across the culms. */
+interface Bar {
+  /** x at the centreline. */
+  x: number;
+  xAt: (y: number) => number;
+  zAt: (y: number) => number;
+  yPort: number;
+  yStbd: number;
+  r: number;
+  crossings: { p: Vector3; r: number }[];
+}
 
 
 export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
@@ -76,208 +89,384 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   const rCentre = rRef;
 
   // ------------------------------------------------------------- crossbeams
+  // Rough natural poles, bark gone, laid across the culm tops. Every bar is
+  // built the same way: it rests on the highest culms under it, and each culm
+  // crossing gets its own rattan lashing.
   const C = spec.crossbeams;
   const centre = hull[Math.round(half)]!;
   const rb = C.diameter_mm / 2;
-  const beamCount = Math.max(2, Math.round(C.count));
-  const sFirst = C.first_from_stern_mm;
-  const sLast = centre.length - C.last_from_bow_mm;
   const lashingGeoms: BufferGeometry[] = [];
+  const stickGeoms: BufferGeometry[] = [];
   const spots: Record<string, Vector3> = {};
-  const beams: { x: number; zAt: (y: number) => number; yPort: number; yStbd: number }[] = [];
-  let deckZ = -Infinity;
+  const halfW = (hull[0]!.pts[0]!.y - hull[N - 1]!.pts[0]!.y) / 2 + 80;
 
-  for (let b = 0; b < beamCount; b++) {
-    const sB = sFirst + ((sLast - sFirst) * b) / (beamCount - 1);
-    const x = sampleAtS(centre, sB).p.x;
-    const crossings = hull.map((c) => sampleAtX(c, x));
-    // Fit z = a + c*y^2 through the culm tops, then lift it so it clears every culm.
+  const layBar = (xOfY: (y: number) => number, r: number, overhang: number, seedK: number, wraps: number, tone: RGB): Bar => {
+    const crossings = hull.map((c) => {
+      let q = interpAtX(c, xOfY(0));
+      q = interpAtX(c, xOfY(q.p.y));
+      return q;
+    });
     const ys = crossings.map((c) => c.p.y);
-    const tops = crossings.map((c) => c.p.z + c.r + rb);
+    const tops = crossings.map((c) => c.p.z + c.r + r * 0.92);
     const fit = fitEven(ys, tops);
     let lift = 0;
     ys.forEach((y, i) => (lift = Math.max(lift, tops[i]! - fit(y))));
-    const zAt = (y: number) => fit(y) + lift;
-    const yPort = Math.max(...ys.map((y, i) => y + crossings[i]!.r)) + C.overhang_mm;
-    const yStbd = Math.min(...ys.map((y, i) => y - crossings[i]!.r)) - C.overhang_mm;
-    beams.push({ x, zAt, yPort, yStbd });
-    if (b < beamCount * 0.7) deckZ = Math.max(deckZ, zAt(0) + rb);
-
-    const seg = 24;
-    const bp: TubePoint[] = [];
+    const sag = (y: number) => 6 * irr * noise1(y / 500, seedK * 17 + spec.seed);
+    const zAt = (y: number) => fit(y) + lift + sag(y);
+    const yPort = Math.max(...ys.map((y, i) => y + crossings[i]!.r)) + overhang;
+    const yStbd = Math.min(...ys.map((y, i) => y - crossings[i]!.r)) - overhang;
+    const seg = 40;
+    const pts: TubePoint[] = [];
     for (let j = 0; j <= seg; j++) {
       const y = yStbd + ((yPort - yStbd) * j) / seg;
-      const xr = x + irr * 10 * noise1(y / 300, b * 13 + spec.seed);
-      bp.push({ p: new Vector3(xr, y, zAt(y)), r: rb * (1 - 0.15 * (j / seg)), color: beamTone(rand) });
+      const wob = irr * (14 * noise1(y / 420, seedK * 13 + spec.seed) + 5 * noise1(y / 90, seedK * 7 + 3));
+      // Natural pole: thicker at the butt end, with slow swells.
+      const rr = r * (1.08 - 0.18 * (j / seg)) * (1 + 0.06 * noise1(y / 260, seedK + 99));
+      pts.push({ p: new Vector3(xOfY(y) + wob, y, zAt(y)), r: rr, color: tone });
     }
-    const beam = new Mesh(sweepTube(bp, { radial: 16, uOffset: rand(), caps: "culm" }), mats.bamboo);
-    beam.castShadow = beam.receiveShadow = true;
-    group.add(beam);
-
-    // Rattan lashing at each culm crossing.
+    const axisAt = (y: number) => {
+      const j = Math.max(1, Math.min(seg - 1, Math.round(((y - yStbd) / (yPort - yStbd)) * seg)));
+      return new Vector3().subVectors(pts[j + 1]!.p, pts[j - 1]!.p).normalize();
+    };
+    const xAt = (y: number) => {
+      const j = Math.max(0, Math.min(seg, Math.round(((y - yStbd) / (yPort - yStbd)) * seg)));
+      return pts[j]!.p.x;
+    };
+    const m = new Mesh(sweepTube(pts, { radial: 18, uOffset: rand(), caps: true }), mats.branch);
+    m.castShadow = m.receiveShadow = true;
+    group.add(m);
     crossings.forEach((c, i) => {
+      const y = c.p.y;
       lashingGeoms.push(
         rattanLashing(
-          { centre: c.p, axis: culmAxisAt(hull[i]!, x), r: c.r },
-          { centre: new Vector3(x, c.p.y, zAt(c.p.y)), axis: new Vector3(0, 1, 0), r: rb },
-          C.wraps,
+          { centre: c.p, axis: culmAxisAt(hull[i]!, c.p.x), r: c.r },
+          { centre: new Vector3(xAt(y), y, zAt(y)), axis: axisAt(y), r },
+          wraps + (rand() < 0.3 ? 1 : 0),
           rand,
         ),
       );
     });
+    return { x: xOfY(0), xAt, zAt, yPort, yStbd, r, crossings };
+  };
+
+  const beamCount = Math.max(2, Math.round(C.count));
+  const sFirst = C.first_from_stern_mm;
+  const sLast = centre.length - C.last_from_bow_mm;
+  const beams: Bar[] = [];
+  let deckZ = -Infinity;
+  for (let b = 0; b < beamCount; b++) {
+    const sB = sFirst + ((sLast - sFirst) * b) / (beamCount - 1) + signed(rand) * 60 * irr;
+    const x = interpAtS(centre, sB).p.x;
+    const bar = layBar(() => x, rb * (0.85 + 0.3 * rand()), C.overhang_mm, b, C.wraps, beamTone(rand));
+    beams.push(bar);
+    deckZ = Math.max(deckZ, bar.zAt(0) + bar.r);
   }
+  const bowBars: Bar[] = [];
+  if (C.second_bow_bar) {
+    const B2 = C.second_bow_bar;
+    const xc = interpAtS(centre, centre.length - B2.from_tip_mm).p.x;
+    bowBars.push(layBar((y) => xc + B2.skew_mm * (y / halfW), B2.diameter_mm / 2, C.overhang_mm, 51, C.wraps, beamTone(rand)));
+  }
+  if (C.bow_bar) {
+    const B1 = C.bow_bar;
+    const xc = interpAtS(centre, centre.length - B1.from_tip_mm).p.x;
+    const bar = layBar((y) => xc - B1.bulge_mm * (y / halfW) ** 2, B1.diameter_mm / 2, C.overhang_mm * 0.6, 53, 3, beamTone(rand));
+    bowBars.push(bar);
+    spots["bow"] = new Vector3(xc, 0, bar.zAt(0));
+  }
+  const allBars = [...beams, ...bowBars].sort((a, b) => a.x - b.x);
 
   // ---------------------------------------------------------------- rails
+  // One thin culm per side, laid on the beam ends right above the outer hull
+  // culm. Big rattan rings gather outer culm, beam end and rail at each beam,
+  // and lighter rings hold rail to culm between beams.
   const R = spec.rails;
+  const rails: { side: number; pts: TubePoint[]; at: (x: number) => { p: Vector3; r: number } }[] = [];
   if (R.enabled && R.per_side > 0) {
-    const bodyBeams = beams.filter((b) => b.x < sampleAtS(centre, centre.length - H.bow.curve_length_mm).p.x + 200);
-    const usable = bodyBeams.length >= 2 ? bodyBeams : beams;
-    const x0 = usable[0]!.x;
-    const x1 = usable[usable.length - 1]!.x;
-    const span = (x1 - x0) * R.length_fraction;
-    const xa = (x0 + x1) / 2 - span / 2 - 250;
-    const xb = (x0 + x1) / 2 + span / 2 + 250;
     const rr = R.diameter_mm / 2;
     for (const side of [1, -1]) {
-      for (let k = 0; k < R.per_side; k++) {
-        const inset = 120 + k * (R.diameter_mm + 10);
-        const pts: TubePoint[] = [];
-        const seg = 40;
-        for (let j = 0; j <= seg; j++) {
-          const x = xa + ((xb - xa) * j) / seg;
-          const bm = nearestBeam(beams, x);
-          const yEdge = side > 0 ? bm.yPort - C.overhang_mm : bm.yStbd + C.overhang_mm;
-          const y = yEdge - side * inset + irr * 10 * noise1(x / 1500, side * 5 + k);
-          const z = maxBeamTop(beams, y, x) + rr;
-          const r = rr * (1 - 0.2 * (j / seg));
-          pts.push({ p: new Vector3(x, y, z), r, color: beamTone(rand) });
+      const outer = side > 0 ? hull[0]! : hull[N - 1]!;
+      const xa = outer.pts[0]!.x - 140 - rand() * 120;
+      const lastBar = bowBars.length ? bowBars[bowBars.length - 1]! : beams[beams.length - 1]!;
+      const xb = lastBar.xAt(side * halfW) + 250;
+      const pts: TubePoint[] = [];
+      const seg = 70;
+      for (let j = 0; j <= seg; j++) {
+        const x = xa + ((xb - xa) * j) / seg;
+        const q = interpAtX(outer, Math.max(outer.pts[0]!.x, x));
+        const y = q.p.y + side * (q.r * 0.15) + irr * 8 * noise1(x / 1300, side * 5);
+        const z = q.p.z + q.r + 2 * rb * 0.95 + rr;
+        const r = rr * (1.06 - 0.22 * (j / seg));
+        pts.push({ p: new Vector3(x, y, z), r, color: railTone(rand) });
+      }
+      smoothZ(pts);
+      const m = new Mesh(sweepTube(pts, { radial: 16, uOffset: rand(), caps: "culm" }), mats.rail);
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
+      const at = (x: number) => {
+        const k = Math.max(0, Math.min(seg - 1, Math.floor(((x - xa) / (xb - xa)) * seg)));
+        const t = Math.max(0, Math.min(1, ((x - xa) / (xb - xa)) * seg - k));
+        return { p: pts[k]!.p.clone().lerp(pts[k + 1]!.p, t), r: pts[k]!.r };
+      };
+      rails.push({ side, pts, at });
+      // Rings at every beam and halfway between.
+      const ringXs: { x: number; wraps: number }[] = [];
+      for (let b = 0; b < allBars.length; b++) {
+        const bx = allBars[b]!.xAt(side * halfW);
+        if (bx > xa + 60 && bx < xb - 60) ringXs.push({ x: bx, wraps: 9 + Math.floor(rand() * 4) });
+        const nb = allBars[b + 1];
+        if (nb) {
+          const mx = (bx + nb.xAt(side * halfW)) / 2 + signed(rand) * 80;
+          if (mx > xa + 60 && mx < xb - 60) ringXs.push({ x: mx, wraps: 5 + Math.floor(rand() * 3) });
         }
-        smoothZ(pts);
-        const m = new Mesh(sweepTube(pts, { radial: 14, uOffset: rand(), caps: "culm" }), mats.bamboo);
-        m.castShadow = m.receiveShadow = true;
-        group.add(m);
-        for (const bm of beams) {
-          if (bm.x < xa + 100 || bm.x > xb - 100) continue;
-          const at = pts.reduce((best, q) => (Math.abs(q.p.x - bm.x) < Math.abs(best.p.x - bm.x) ? q : best));
-          lashingGeoms.push(
-            rattanLashing(
-              { centre: new Vector3(bm.x, at.p.y, bm.zAt(at.p.y)), axis: new Vector3(0, 1, 0), r: rb },
-              { centre: new Vector3(bm.x, at.p.y, at.p.z), axis: new Vector3(1, 0, 0), r: at.r },
-              3,
-              rand,
-            ),
-          );
-        }
+      }
+      for (const { x, wraps } of ringXs) {
+        const q = interpAtX(outer, x);
+        const rp = at(x);
+        lashingGeoms.push(bundleRing([{ c: q.p, r: q.r }, { c: rp.p.clone().setX(q.p.x), r: rp.r }], new Vector3(1, 0, 0), wraps, rand, 2.5));
       }
     }
   }
 
   // ---------------------------------------------------------------- keels
+  // Three culms under each outer culm toward the stern, stacked in a
+  // triangle (two side by side under the hull, one below them), forward ends
+  // cut on a slant.
   const K = spec.keels;
   if (K.enabled && K.per_side > 0) {
     const rk = K.diameter_mm / 2;
-    const len = H.length_mm * K.length_fraction;
-    const xc = H.length_mm * K.centre_fraction;
     for (const side of [1, -1]) {
-      for (let k = 0; k < Math.min(K.per_side, Math.floor(N / 2)); k++) {
-        const host = side > 0 ? hull[k]! : hull[N - 1 - k]!;
+      const host = side > 0 ? hull[0]! : hull[N - 1]!;
+      const x0 = host.pts[0]!.x - 40 - rand() * 80;
+      const len = H.length_mm * K.length_fraction;
+      const slots: { dy: number; dz: number }[] =
+        (K.stack ?? "triangle") === "triangle"
+          ? [
+              { dy: 0, dz: -rk },
+              { dy: -side * 2.05 * rk, dz: -rk },
+              { dy: -side * 1.02 * rk, dz: -rk - 1.75 * rk },
+            ]
+          : Array.from({ length: K.per_side }, (_, k) => ({ dy: -side * k * 2.05 * rk, dz: -rk }));
+      const keelMembers: { pts: TubePoint[] }[] = [];
+      slots.slice(0, K.per_side).forEach((sl, k) => {
         const pts: TubePoint[] = [];
         const seg = 30;
+        const myLen = len * (0.92 + 0.12 * rand()) - k * 60;
+        const xs = x0 + rand() * 60;
+        const rr = rk * (0.9 + 0.2 * rand());
         for (let j = 0; j <= seg; j++) {
-          const x = xc - len / 2 + (len * j) / seg;
-          const h = sampleAtX(host, x);
+          const x = xs + (myLen * j) / seg;
+          const h = interpAtX(host, x);
+          const crook = irr * 10 * noise1(x / 900, side * 11 + k);
           pts.push({
-            p: new Vector3(x, h.p.y, h.p.z - h.r - rk - 6),
-            r: rk * (1 - 0.18 * (j / seg)),
-            color: mix(beamTone(rand), [0.2, 0.22, 0.14], 0.35),
+            p: new Vector3(x, h.p.y + sl.dy * (rr / rk) + crook, h.p.z - h.r + sl.dz * (rr / rk) - 3),
+            r: rr * (1 - 0.15 * (j / seg)),
+            color: mix(beamTone(rand), [0.36, 0.3, 0.2], 0.4),
           });
         }
-        const m = new Mesh(sweepTube(pts, { radial: 12, uOffset: rand(), caps: "culm" }), mats.bamboo);
+        const m = new Mesh(
+          sweepTube(pts, {
+            radial: 18,
+            uOffset: rand(),
+            caps: "culm",
+            slantEnd: { dir: new Vector3(0, 0, 1), k: K.front_slant ?? 1.4 },
+          }),
+          mats.keel,
+        );
         m.castShadow = m.receiveShadow = true;
         group.add(m);
-        for (const bm of beams) {
-          if (bm.x < xc - len / 2 + 80 || bm.x > xc + len / 2 - 80) continue;
-          const h = sampleAtX(host, bm.x);
-          lashingGeoms.push(
-            rattanLashing(
-              { centre: new Vector3(bm.x + 40, h.p.y, h.p.z - h.r - rk - 6), axis: new Vector3(1, 0, 0), r: rk },
-              { centre: new Vector3(bm.x + 40, h.p.y, h.p.z), axis: new Vector3(1, 0, 0), r: h.r },
-              4,
-              rand,
-            ),
-          );
+        keelMembers.push({ pts });
+        if (k === 0 && side < 0) spots["keel"] = pts[pts.length - 1]!.p.clone();
+      });
+      // Lashings round host and keels, at the beams and between.
+      const xEnd = x0 + len * 0.9;
+      const ringXs = allBars.map((b) => b.xAt(side * halfW)).filter((x) => x > x0 + 120 && x < xEnd - 80);
+      const extra = ringXs.slice(0, -1).map((x, i) => (x + ringXs[i + 1]!) / 2);
+      for (const x of [...ringXs, ...extra]) {
+        const h = interpAtX(host, x);
+        const circles = [{ c: h.p, r: h.r }];
+        for (const km of keelMembers) {
+          const kp = km.pts;
+          const jl = Math.round(((x - kp[0]!.p.x) / (kp[kp.length - 1]!.p.x - kp[0]!.p.x)) * (kp.length - 1));
+          if (jl < 0 || jl > kp.length - 1) continue;
+          const q = kp[jl]!;
+          circles.push({ c: q.p.clone().setX(h.p.x), r: q.r });
+        }
+        lashingGeoms.push(bundleRing(circles, new Vector3(1, 0, 0), 6 + Math.floor(rand() * 3), rand, 2));
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- deck mats
+  // Separate woven split-bamboo panels laid on the culms between crossbeams,
+  // stopping a culm or two short of each edge, framed by lengthwise sticks.
+  const D = spec.deck;
+  if (D.enabled && D.to_fraction > D.from_fraction) {
+    const xLo = H.length_mm * D.from_fraction;
+    const xHi = H.length_mm * D.to_fraction;
+    const frames = allBars.filter((b) => b.x > xLo - 400 && b.x < xHi + 400);
+    for (let k = 0; k < frames.length - 1; k++) {
+      const A = frames[k]!;
+      const B = frames[k + 1]!;
+      const inset = 1 + (rand() < 0.5 ? 1 : 0);
+      const yHi = hull[inset]!.pts[0]!.y + hull[inset]!.r[0]! * 0.2;
+      const yLo = hull[N - 1 - inset]!.pts[0]!.y - hull[N - 1 - inset]!.r[0]! * 0.2;
+      const segX = 30;
+      const segY = Math.ceil((yHi - yLo) / 22);
+      const verts: number[] = [];
+      const uvs: number[] = [];
+      const cols: number[] = [];
+      const idx: number[] = [];
+      const tone = 0.75 + 0.5 * rand();
+      for (let i = 0; i <= segX; i++) {
+        for (let j = 0; j <= segY; j++) {
+          const y = yLo + ((yHi - yLo) * j) / segY;
+          const xa = A.xAt(y) + A.r * 0.9;
+          const xb = B.xAt(y) - B.r * 0.9;
+          const x = xa + ((xb - xa) * i) / segX;
+          const z = matZ(hull, x, y) + 4;
+          verts.push(x, y, z);
+          uvs.push(x / 1000, y / 1000);
+          cols.push(tone, tone, tone);
+        }
+      }
+      for (let i = 0; i < segX; i++)
+        for (let j = 0; j < segY; j++) {
+          const a = i * (segY + 1) + j;
+          idx.push(a, a + segY + 1, a + 1, a + 1, a + segY + 1, a + segY + 2);
+        }
+      const g = new BufferGeometry();
+      g.setAttribute("position", new Float32BufferAttribute(verts, 3));
+      g.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+      g.setAttribute("color", new Float32BufferAttribute(cols, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      const m = new Mesh(g, mats.deck);
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
+      // Lengthwise sticks along the panel edges, lashed to the culm under them.
+      for (const yEdge of [yHi + 22, yLo - 22]) {
+        const xa = A.xAt(yEdge) - A.r * 0.3;
+        const xb = B.xAt(yEdge) + B.r * 0.3;
+        const rs = 17 + rand() * 7;
+        const pts: TubePoint[] = [];
+        const seg = 12;
+        for (let j = 0; j <= seg; j++) {
+          const x = xa + ((xb - xa) * j) / seg;
+          const y = yEdge + irr * 18 * noise1(x / 300, k * 3 + (yEdge > 0 ? 1 : 2));
+          pts.push({ p: new Vector3(x, y, matZ(hull, x, y) + rs + 2), r: rs * (1 - 0.25 * (j / seg)) });
+        }
+        stickGeoms.push(sweepTube(pts, { radial: 10, uOffset: rand(), caps: true }));
+        for (const t of [0.15, 0.85]) {
+          const p = pts[Math.round(t * seg)]!;
+          const host = nearestCulmAtY(hull, p.p.x, p.p.y);
+          lashingGeoms.push(bundleRing([{ c: host.p, r: host.r }, { c: p.p.clone().setX(host.p.x), r: p.r }], new Vector3(1, 0, 0), 2 + Math.floor(rand() * 2), rand, 1));
         }
       }
     }
   }
 
-  // ---------------------------------------------------------------- deck mat
-  const D = spec.deck;
-  if (D.enabled && D.to_fraction > D.from_fraction) {
-    const x0 = H.length_mm * D.from_fraction;
-    const x1 = H.length_mm * D.to_fraction;
-    const segX = 30;
-    const segY = 12;
-    const verts: number[] = [];
-    const uvs: number[] = [];
-    const idx: number[] = [];
-    for (let i = 0; i <= segX; i++) {
-      const x = x0 + ((x1 - x0) * i) / segX;
-      const bm = nearestBeam(beams, x);
-      const y0 = bm.yStbd + C.overhang_mm + 60;
-      const y1 = bm.yPort - C.overhang_mm - 60;
-      for (let j = 0; j <= segY; j++) {
-        const y = y0 + ((y1 - y0) * j) / segY;
-        const z = maxBeamTop(beams, y, x) + 8;
-        verts.push(x, y, z);
-        uvs.push(x / 1000, y / 1000);
-      }
-    }
-    for (let i = 0; i < segX; i++)
-      for (let j = 0; j < segY; j++) {
-        const a = i * (segY + 1) + j;
-        idx.push(a, a + segY + 1, a + 1, a + 1, a + segY + 1, a + segY + 2);
-      }
-    const g = new BufferGeometry();
-    g.setAttribute("position", new Float32BufferAttribute(verts, 3));
-    g.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    const m = new Mesh(g, mats.deck);
-    m.castShadow = m.receiveShadow = true;
-    group.add(m);
-  }
-
-  // ---------------------------------------------------------------- oar posts
+  // ---------------------------------------------------------------- oar posts and oars
+  // Each post: a hollowed-out log fitted over the rail, two branches set in
+  // holes inside it (splayed fore and aft, leaning outboard), each branch held
+  // by two rattan knots. The oar is stowed between the two branches, handle
+  // on the deck, blade raised outboard.
   const O = spec.oar_posts;
-  if (O.enabled) {
-    for (const bi of O.beams) {
-      const bm = beams[bi];
-      if (!bm) continue;
-      for (const side of [1, -1]) {
-        const y = (side > 0 ? bm.yPort : bm.yStbd) - side * 70;
-        const base = new Vector3(bm.x, y, bm.zAt(y) + rb * 0.6);
-        const tilt = (O.outward_tilt_deg * Math.PI) / 180;
-        const dir = new Vector3(0, side * Math.sin(tilt), Math.cos(tilt));
-        const top = base.clone().addScaledVector(dir, O.height_mm);
-        const post = sweepTube(straight(base, top, (t) => 34 - 8 * t, 6), { radial: 10 });
-        const forkA = top.clone().add(new Vector3(110, side * 30, 170));
-        const forkB = top.clone().add(new Vector3(-110, side * 30, 170));
-        const fa = sweepTube(straight(top, forkA, (t) => 24 - 10 * t, 4), { radial: 8 });
-        const fb = sweepTube(straight(top, forkB, (t) => 24 - 10 * t, 4), { radial: 8 });
-        const m = new Mesh(mergeGeometries([post, fa, fb])!, mats.wood);
-        m.castShadow = true;
-        group.add(m);
-        lashingGeoms.push(rattanSeizing({ centre: base.clone().addScaledVector(dir, 20), axis: dir, r: 33 }, 5));
-        lashingGeoms.push(
-          rattanLashing(
-            { centre: new Vector3(bm.x, y, bm.zAt(y)), axis: new Vector3(0, 1, 0), r: rb },
-            { centre: new Vector3(bm.x, y, bm.zAt(y) + rb + 34), axis: new Vector3(1, 0, 0), r: 34 },
-            2,
-            rand,
-          ),
-        );
+  if (O.enabled && rails.length) {
+    const logGeoms: BufferGeometry[] = [];
+    const oarGeoms: BufferGeometry[] = [];
+    const lr = O.log_diameter_mm / 2;
+    const tilt = (O.outward_tilt_deg * Math.PI) / 180;
+    const splay = (O.splay_deg * Math.PI) / 180;
+    O.stations_fraction.forEach((f, si) => {
+      for (const rail of rails) {
+        const side = rail.side;
+        const x = H.length_mm * f + signed(rand) * 80;
+        const rp = rail.at(x);
+        const c = rp.p.clone().add(new Vector3(0, side * 10, rp.r * 0.55 + lr * 0.55));
+        const ll = O.log_length_mm * (0.9 + 0.2 * rand());
+        // Hewn, roughly squared log.
+        const lpts = straight(c.clone().add(new Vector3(-ll / 2, 0, 0)), c.clone().add(new Vector3(ll / 2, 0, 0)), (t) => lr * (1 + 0.05 * Math.sin(t * 5 + si)), 8);
+        logGeoms.push(sweepTube(lpts, { radial: 24, uOffset: rand(), caps: true, shape: (_i, th) => 1 + 0.09 * Math.cos(4 * th) }));
+        const logTop = c.z + lr * 0.95;
+        // Log bound to rail and outer culm at both ends.
+        for (const dx of [-ll / 2 + 70, ll / 2 - 70]) {
+          const q = rail.at(x + dx);
+          const oc = interpAtX(side > 0 ? hull[0]! : hull[N - 1]!, x + dx);
+          lashingGeoms.push(
+            bundleRing([{ c: q.p, r: q.r }, { c: c.clone().add(new Vector3(dx, 0, 0)), r: lr * 0.97 }, { c: oc.p.clone().setX(q.p.x), r: oc.r }], new Vector3(1, 0, 0), 5, rand, 2),
+          );
+        }
+        const tips: Vector3[] = [];
+        for (const fa of [-1, 1]) {
+          const base = new Vector3(x + fa * ll * 0.2, c.y + side * lr * 0.15, logTop - 10);
+          const dir = new Vector3(fa * Math.sin(splay), side * Math.sin(tilt), 1).normalize();
+          const h = O.height_mm * (0.92 + 0.16 * rand());
+          const bpts: TubePoint[] = [];
+          const seg = 14;
+          for (let j = 0; j <= seg; j++) {
+            const t = j / seg;
+            const p = base.clone().addScaledVector(dir, -90 + (h + 90) * t);
+            p.x += irr * 22 * Math.sin(t * 3.1 + si + fa) * t;
+            p.y += irr * 14 * Math.sin(t * 2.3 + fa * 2) * t;
+            bpts.push({ p, r: 25 * (1 - 0.35 * t) * (1 + 0.08 * Math.sin(t * 17 + fa)) });
+          }
+          stickGeoms.push(sweepTube(bpts, { radial: 12, uOffset: rand(), caps: true }));
+          tips.push(bpts[seg]!.p);
+          // Two rattan knots per branch, where it leaves the log.
+          for (const [along, turns] of [
+            [30, 5],
+            [120, 4],
+          ] as const) {
+            lashingGeoms.push(rattanSeizing({ centre: base.clone().addScaledVector(dir, along), axis: dir, r: 25 * (1 - 0.35 * (along / h)) + 2 }, turns));
+          }
+        }
+        if (si === 0 && side > 0) spots["oarpost"] = new Vector3(x, c.y, logTop + 200);
+
+        // Oar.
+        const OA = O.oars;
+        if (OA?.enabled) {
+          // Stowed fore and aft, resting on the log beside the branches, handle
+          // aft on the deck, blade raised forward (as in the rigged photo).
+          const el = (OA.elevation_deg * (0.85 + 0.3 * rand()) * Math.PI) / 180;
+          const yaw = side * (0.03 + 0.05 * rand());
+          const dir = new Vector3(Math.cos(el) * Math.cos(yaw), -Math.cos(el) * Math.sin(yaw), Math.sin(el)).normalize();
+          const rs0 = OA.shaft_diameter_mm / 2;
+          const pivot = new Vector3(x, c.y - side * (40 + rs0), logTop + rs0);
+          const tDeck = (pivot.z - (deckZ + rs0)) / dir.z;
+          const handle = pivot.clone().addScaledVector(dir, -tDeck);
+          const tip = handle.clone().addScaledVector(dir, OA.length_mm);
+          const bladeStart = tip.clone().addScaledVector(dir, -OA.blade_length_mm);
+          const rs = OA.shaft_diameter_mm / 2;
+          const spts = straight(handle, bladeStart, (t) => rs * (t < 0.08 ? 0.85 : 1) * (1 + 0.1 * t), 10);
+          oarGeoms.push(sweepTube(spts, { radial: 12, uOffset: rand(), caps: true }));
+          // Blade: flat, widening from the shaft; the flat face lies fore and aft.
+          const bp: TubePoint[] = [];
+          const aspect: number[] = [];
+          const segB = 12;
+          const thick = 13;
+          for (let j = 0; j <= segB; j++) {
+            const t = j / segB;
+            const w = rs + (OA.blade_width_mm / 2 - rs) * Math.min(1, t / 0.3) ** 0.7 * (t > 0.92 ? 0.94 : 1);
+            bp.push({ p: bladeStart.clone().lerp(tip, t), r: w });
+            aspect.push(Math.max(thick / w, 0.06));
+          }
+          // Build the blade so its wide axis is along x (fore and aft).
+          oarGeoms.push(bladeGeometry(bp, aspect, new Vector3(1, 0, 0)));
+          lashingGeoms.push(rattanSeizing({ centre: handle.clone().addScaledVector(dir, 120), axis: dir, r: rs * 0.85 + 2 }, 3));
+          void tips;
+        }
       }
+    });
+    if (logGeoms.length) {
+      const m = new Mesh(mergeGeometries(logGeoms)!, mats.log);
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
+    }
+    if (oarGeoms.length) {
+      const m = new Mesh(mergeGeometries(oarGeoms)!, mats.oar);
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
     }
   }
 
@@ -285,80 +474,68 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   const G = spec.rig;
   if (G.enabled) {
     const sMast = centre.length * G.mast_fraction;
-    const mastX = sampleAtS(centre, sMast).p.x;
-    const mastBaseZ = maxBeamTop(beams, 0, mastX) - 20;
+    const mastX = interpAtS(centre, sMast).p.x;
+    // Mast step: a hewn block notched over the beam nearest the mast, socket near one end.
+    const stepBeam = nearestBeam(beams, mastX);
+    const blockR = 95;
+    const blockZ = stepBeam.zAt(0) + stepBeam.r * 0.6 + blockR * 0.8;
+    const bpts = straight(new Vector3(mastX - 160, 0, blockZ), new Vector3(mastX + 420, 0, blockZ), (t) => blockR * (t > 0.75 ? 1 - (t - 0.75) * 1.4 : 1), 10);
+    const block = new Mesh(sweepTube(bpts, { radial: 24, caps: true, shape: (_i, th) => 1 + 0.12 * Math.cos(4 * th) }), mats.log);
+    block.castShadow = block.receiveShadow = true;
+    group.add(block);
+    lashingGeoms.push(
+      rattanLashing({ centre: new Vector3(stepBeam.xAt(0), 0, stepBeam.zAt(0)), axis: new Vector3(0, 1, 0), r: stepBeam.r }, { centre: new Vector3(stepBeam.xAt(0), 0, blockZ), axis: new Vector3(1, 0, 0), r: blockR }, 10, rand),
+    );
+    const mastBaseZ = blockZ + blockR * 0.6;
     const mastTop = new Vector3(mastX, 0, mastBaseZ + G.mast_height_mm);
     const rm = G.mast_diameter_mm / 2;
     const mast = new Mesh(
-      sweepTube(straight(new Vector3(mastX, 0, centre.pts[0]!.z), mastTop, (t) => rm * (1 - 0.4 * t), 24), {
-        radial: 16,
-        tint: [0.22, 0.17, 0.11],
+      sweepTube(straight(new Vector3(mastX, 0, mastBaseZ - 60), mastTop, (t) => rm * (1 - 0.42 * t), 24), {
+        radial: 18,
+        caps: true,
+        tint: [0.5, 0.42, 0.32],
       }),
-      mats.bamboo,
+      mats.mast,
     );
     mast.castShadow = mast.receiveShadow = true;
     group.add(mast);
-    // Partners: two short braces that hold the mast upright on the beams.
-    for (const dx of [-1, 1]) {
-      const a = new Vector3(mastX + dx * 700, 0, maxBeamTop(beams, 0, mastX + dx * 700));
-      const b2 = new Vector3(mastX + dx * rm, 0, mastBaseZ + 900);
-      const brace = new Mesh(sweepTube(straight(a, b2, 30, 6), { radial: 10 }), mats.wood);
-      brace.castShadow = true;
-      group.add(brace);
-    }
-    lashingGeoms.push(rattanSeizing({ centre: new Vector3(mastX, 0, mastBaseZ + 860), axis: new Vector3(0, 0, 1), r: rm * 0.93 + 6 }, 9));
-    lashingGeoms.push(rattanSeizing({ centre: new Vector3(mastX, 0, mastBaseZ + 40), axis: new Vector3(0, 0, 1), r: rm }, 6));
 
     const ropeGeoms: BufferGeometry[] = [];
     const mastAt = (z: number): Member => ({
       centre: new Vector3(mastX, 0, z),
       axis: new Vector3(0, 0, 1),
-      r: rm * (1 - 0.4 * ((z - centre.pts[0]!.z) / (mastTop.z - centre.pts[0]!.z))),
-    });
-    const beamMember = (bm: (typeof beams)[number], y: number): Member => ({
-      centre: new Vector3(bm.x, y, bm.zAt(y)),
-      axis: new Vector3(0, 1, 0),
-      r: rb,
+      r: rm * (1 - 0.42 * ((z - mastBaseZ) / (mastTop.z - mastBaseZ))),
     });
     if (G.stays) {
-      // Every stay is made fast at the masthead with turns round the mast.
-      const head = mastTop.clone().add(new Vector3(0, 0, -260));
+      // Four stays, masthead to each corner of the raft.
+      const head = mastTop.clone().add(new Vector3(0, 0, -300));
       spots["masthead"] = head.clone();
       ropeGeoms.push(laidRopeSeizing(mastAt(head.z), 5));
-      const bowTip = centre.pts[centre.pts.length - 1]!;
-      const nearTip = sampleAtS(centre, centre.length - 260);
-      const tipAxis = culmAxisAt(centre, nearTip.p.x);
-      ropeGeoms.push(
-        riggedRope(head, nearTip.p.clone().add(new Vector3(0, 0, nearTip.r + ROPE_R)), 0.01, undefined, {
-          centre: nearTip.p,
-          axis: tipAxis,
-          r: nearTip.r,
-        }),
-      );
-      void bowTip;
-      const sternBeam = beams[0]!;
-      ropeGeoms.push(riggedRope(head, new Vector3(sternBeam.x, 0, sternBeam.zAt(0) + rb), 0.012, undefined, beamMember(sternBeam, 0)));
-      for (const side of [1, -1]) {
-        for (const dx of [-900, 500]) {
-          const bm = nearestBeam(beams, mastX + dx);
-          const y = side > 0 ? bm.yPort - 60 : bm.yStbd + 60;
-          if (side < 0 && dx < 0) spots["knot"] = new Vector3(bm.x, y, bm.zAt(y));
-          ropeGeoms.push(riggedRope(head, new Vector3(bm.x, y, bm.zAt(y) + rb), 0.008, undefined, beamMember(bm, y)));
+      for (const rail of rails) {
+        const s0 = rail.pts[2]!;
+        const s1 = rail.pts[rail.pts.length - 4]!;
+        for (const end of [s0, s1]) {
+          const tie = end.p.clone().add(new Vector3(0, 0, end.r + ROPE_R));
+          ropeGeoms.push(riggedRope(head, tie, 0.006, undefined, { centre: end.p, axis: new Vector3(1, 0, 0), r: end.r }));
         }
+        if (rail.side < 0) spots["knot"] = s0.p.clone();
       }
     }
 
     if (G.sail.enabled) {
       const sail = buildSail(G.sail, mastX, mastBaseZ, mastTop.z, rm, mats, rand);
       group.add(sail.group);
+      // Sheets all gather to one point at the stern, on the sternmost beam.
+      const sb = beams[0]!;
+      const sy = -220;
       for (const run of sail.ropes) {
         if (run.kind === "sheet") {
-          // Sheets gather on the crossbeam under the sheeting point.
-          const bm = nearestBeam(beams, run.b.x);
-          const y = Math.max(bm.yStbd + 100, Math.min(bm.yPort - 100, run.b.y));
-          ropeGeoms.push(riggedRope(run.a, new Vector3(bm.x, y, bm.zAt(y) + rb), run.sag, run.endA, beamMember(bm, y)));
+          ropeGeoms.push(riggedRope(run.a, new Vector3(sb.xAt(sy), sy, sb.zAt(sy) + sb.r), run.sag, run.endA, { centre: new Vector3(sb.xAt(sy), sy, sb.zAt(sy)), axis: new Vector3(0, 1, 0), r: sb.r }));
         } else if (run.kind === "halyard") {
+          // Down the mast to the step.
+          const foot = new Vector3(mastX + rm + ROPE_R, 0, mastBaseZ + 700);
           ropeGeoms.push(riggedRope(run.a, run.b, run.sag, mastAt(run.a.z), run.endB));
+          ropeGeoms.push(riggedRope(run.a.clone().add(new Vector3(rm + ROPE_R, 0, 0)), foot, 0.0, undefined, mastAt(foot.z)));
         } else {
           ropeGeoms.push(riggedRope(run.a, run.b, run.sag, run.endA, run.endB));
         }
@@ -369,6 +546,12 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
       m.castShadow = true;
       group.add(m);
     }
+  }
+
+  if (stickGeoms.length) {
+    const m = new Mesh(mergeGeometries(stickGeoms)!, mats.branch);
+    m.castShadow = m.receiveShadow = true;
+    group.add(m);
   }
 
   // ---------------------------------------------------------------- nodes + lashings
@@ -392,6 +575,110 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
 }
 
 // ======================================================================= helpers
+
+function interpAtX(c: CulmPath, x: number): { p: Vector3; r: number } {
+  const n = c.pts.length;
+  if (x <= c.pts[0]!.x) return { p: c.pts[0]!.clone(), r: c.r[0]! };
+  if (x >= c.pts[n - 1]!.x) return { p: c.pts[n - 1]!.clone(), r: c.r[n - 1]! };
+  let lo = 0;
+  let hi = n - 1;
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1;
+    if (c.pts[m]!.x <= x) lo = m;
+    else hi = m;
+  }
+  const a = c.pts[lo]!;
+  const b = c.pts[hi]!;
+  const t = b.x === a.x ? 0 : (x - a.x) / (b.x - a.x);
+  return { p: a.clone().lerp(b, t), r: c.r[lo]! * (1 - t) + c.r[hi]! * t };
+}
+
+function interpAtS(c: CulmPath, s: number): { p: Vector3; r: number } {
+  let j = 0;
+  while (j < c.s.length - 2 && c.s[j + 1]! <= s) j++;
+  const t = Math.max(0, Math.min(1, (s - c.s[j]!) / (c.s[j + 1]! - c.s[j]!)));
+  return { p: c.pts[j]!.clone().lerp(c.pts[j + 1]!, t), r: c.r[j]! * (1 - t) + c.r[j + 1]! * t };
+}
+
+/** Height of a mat lying on the culms at (x, y): the culm tops, with the mat bridging narrow gaps. */
+function matZ(hull: CulmPath[], x: number, y: number): number {
+  let z = -Infinity;
+  for (const c of hull) {
+    const q = interpAtX(c, x);
+    const dy = y - q.p.y;
+    const reach = q.r + 14; // the weave bridges gaps a little
+    if (Math.abs(dy) < reach) z = Math.max(z, q.p.z + Math.sqrt(Math.max(0, reach * reach - dy * dy)) - 14);
+  }
+  if (!Number.isFinite(z)) z = interpAtX(hull[Math.floor(hull.length / 2)]!, x).p.z;
+  return z;
+}
+
+function nearestCulmAtY(hull: CulmPath[], x: number, y: number): { p: Vector3; r: number } {
+  let best = interpAtX(hull[0]!, x);
+  for (const c of hull) {
+    const q = interpAtX(c, x);
+    if (Math.abs(q.p.y - y) < Math.abs(best.p.y - y)) best = q;
+  }
+  return best;
+}
+
+function railTone(rand: () => number): RGB {
+  const k = 0.95 + 0.2 * rand();
+  return [0.48 * k, 0.44 * k, 0.38 * k];
+}
+
+/**
+ * A flat oar blade along a path: an ellipse whose wide axis lies along `wide`
+ * (projected off the path), thinning to `aspect` of the width.
+ */
+function bladeGeometry(pts: TubePoint[], aspect: number[], wide: Vector3): BufferGeometry {
+  const n = pts.length;
+  const radial = 20;
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  const t = new Vector3().subVectors(pts[n - 1]!.p, pts[0]!.p).normalize();
+  const a = wide.clone().sub(t.clone().multiplyScalar(wide.dot(t))).normalize();
+  const b = new Vector3().crossVectors(t, a);
+  let arc = 0;
+  for (let i = 0; i < n; i++) {
+    if (i > 0) arc += pts[i]!.p.distanceTo(pts[i - 1]!.p) / 1000;
+    const w = pts[i]!.r;
+    const th = w * aspect[i]!;
+    for (let j = 0; j <= radial; j++) {
+      const ang = (j / radial) * Math.PI * 2;
+      const p = pts[i]!.p.clone().addScaledVector(a, Math.cos(ang) * w).addScaledVector(b, Math.sin(ang) * th);
+      const nn = a.clone().multiplyScalar(Math.cos(ang) / w).addScaledVector(b, Math.sin(ang) / th).normalize();
+      pos.push(p.x, p.y, p.z);
+      nor.push(nn.x, nn.y, nn.z);
+      uv.push(j / radial, arc);
+      col.push(1, 1, 1);
+    }
+  }
+  for (let i = 0; i < n - 1; i++)
+    for (let j = 0; j < radial; j++) {
+      const p0 = i * (radial + 1) + j;
+      idx.push(p0, p0 + 1, p0 + radial + 1, p0 + 1, p0 + radial + 2, p0 + radial + 1);
+    }
+  // Close the tip.
+  const last = (n - 1) * (radial + 1);
+  const c0 = pos.length / 3;
+  const tp = pts[n - 1]!.p;
+  pos.push(tp.x, tp.y, tp.z);
+  nor.push(t.x, t.y, t.z);
+  uv.push(0.5, arc);
+  col.push(1, 1, 1);
+  for (let j = 0; j < radial; j++) idx.push(last + j, c0, last + j + 1);
+  const g = new BufferGeometry();
+  g.setAttribute("position", new Float32BufferAttribute(pos, 3));
+  g.setAttribute("normal", new Float32BufferAttribute(nor, 3));
+  g.setAttribute("uv", new Float32BufferAttribute(uv, 2));
+  g.setAttribute("color", new Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+}
 
 function sampleAtS(c: CulmPath, s: number): { p: Vector3; r: number } {
   let j = 0;

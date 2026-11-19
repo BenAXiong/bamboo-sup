@@ -50,6 +50,8 @@ export interface HullSpec {
   irregularity: number;
   /** Stern ends are trimmed unevenly; max stagger in mm. */
   stern_stagger_mm: number;
+  /** Random spread of the bow tips (mm, either way), scaled by irregularity. */
+  bow_stagger_mm?: number;
   node_spacing_mm: number;
   /** 0..1 strength of the fire-bending scorch over the bow bend. */
   scorch: number;
@@ -66,6 +68,13 @@ export interface CrossbeamSpec {
   overhang_mm: number;
   /** Rattan wraps per culm crossing. */
   wraps: number;
+  /**
+   * The thick natural pole bent into an arc across the bow, bulging forward,
+   * lashed to every culm. Distance measured along the centre culm from its tip.
+   */
+  bow_bar?: { from_tip_mm: number; bulge_mm: number; diameter_mm: number };
+  /** A straighter pole further aft across the bow, at an angle. */
+  second_bow_bar?: { from_tip_mm: number; skew_mm: number; diameter_mm: number };
 }
 
 export interface RailSpec {
@@ -78,13 +87,22 @@ export interface RailSpec {
 }
 
 export interface KeelSpec {
-  /** Palafang (2025) added three bamboo members beneath each side to resist leeway. */
+  /**
+   * Culms lashed under each outer hull culm, toward the stern, to resist
+   * leeway. On the Palafang raft: three per side stacked in a triangle (two
+   * side by side under the hull, one below them), so from the side one is
+   * hidden. The forward ends are cut on a slant.
+   */
   enabled: boolean;
   per_side: number;
   diameter_mm: number;
   length_fraction: number;
   /** Centre of the keel run, as a fraction of hull length from the stern. */
   centre_fraction: number;
+  /** "triangle" (2 over 1) or "row" (side by side, legacy). */
+  stack?: "triangle" | "row";
+  /** Slant of the forward cut: how far the top sticks out past the bottom, in radii. */
+  front_slant?: number;
 }
 
 export interface DeckSpec {
@@ -95,11 +113,25 @@ export interface DeckSpec {
 }
 
 export interface OarPostSpec {
+  /**
+   * Oar posts (thole posts), one per side at each station. Each is a
+   * hollowed-out log fitted on the rail, with two branches set in holes inside
+   * it, each branch held by two rattan knots. The oar passes between the two
+   * branches.
+   */
   enabled: boolean;
-  /** Crossbeam indices (0 = sternmost) that carry a pair of forked oar posts. */
-  beams: number[];
+  /** Post stations, as fractions of hull length from the stern. */
+  stations_fraction: number[];
+  /** Height of the branches above the log. */
   height_mm: number;
   outward_tilt_deg: number;
+  /** Log length along the rail and diameter. */
+  log_length_mm: number;
+  log_diameter_mm: number;
+  /** Fore-and-aft splay of the two branches, degrees each side of vertical. */
+  splay_deg: number;
+  /** Oars: one per post, stowed between the branches, blade raised outboard. */
+  oars: { enabled: boolean; length_mm: number; blade_length_mm: number; blade_width_mm: number; shaft_diameter_mm: number; elevation_deg: number };
 }
 
 export interface SailSpec {
@@ -134,6 +166,7 @@ export interface RigSpec {
   mast_fraction: number;
   mast_height_mm: number;
   mast_diameter_mm: number;
+  /** Four stays from the masthead, one to each corner of the raft. */
   stays: boolean;
   sail: SailSpec;
 }
