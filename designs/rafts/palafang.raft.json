@@ -1,0 +1,91 @@
+{
+  "spec_version": 1,
+  "id": "RAFT-PALAFANG-01",
+  "name": "Palafang-style Amis sailing raft (visual reconstruction)",
+  "notes": "Visual estimate, NOT measured. Proportions taken from Ben's photo of the reconstructed sailing raft (woven sea-hibiscus bark sail, about ten battens, balanced-lug shape) and the Laway / IRA2 process report: tips forward, thickest culms in the middle, about one crossbeam per metre, three bow beams, yellow-rattan lashing, three keel members under each side (Palafang 2025). Replace with measured values when available.",
+  "seed": 7,
+  "hull": {
+    "culm_count": 9,
+    "length_mm": 11000,
+    "diameter_base_mm": 170,
+    "diameter_tip_mm": 105,
+    "edge_diameter_reduction": 0.18,
+    "gap_mm": 4,
+    "bow": {
+      "curve_length_mm": 3200,
+      "tip_rise_mm": 950,
+      "shape": "power",
+      "exponent": 2.2,
+      "outer_extra_rise": 0.25,
+      "tuck": 0.28
+    },
+    "irregularity": 0.5,
+    "stern_stagger_mm": 220,
+    "node_spacing_mm": 380,
+    "scorch": 0.75
+  },
+  "crossbeams": {
+    "count": 10,
+    "first_from_stern_mm": 350,
+    "last_from_bow_mm": 650,
+    "diameter_mm": 75,
+    "overhang_mm": 160,
+    "wraps": 4
+  },
+  "rails": {
+    "enabled": true,
+    "per_side": 1,
+    "diameter_mm": 115,
+    "length_fraction": 0.88
+  },
+  "keels": {
+    "enabled": true,
+    "per_side": 3,
+    "diameter_mm": 120,
+    "length_fraction": 0.5,
+    "centre_fraction": 0.42
+  },
+  "deck": {
+    "enabled": false,
+    "from_fraction": 0.12,
+    "to_fraction": 0.62
+  },
+  "oar_posts": {
+    "enabled": true,
+    "beams": [
+      2,
+      6
+    ],
+    "height_mm": 650,
+    "outward_tilt_deg": 15
+  },
+  "rig": {
+    "enabled": true,
+    "mast_fraction": 0.56,
+    "mast_height_mm": 8000,
+    "mast_diameter_mm": 125,
+    "stays": true,
+    "sail": {
+      "enabled": true,
+      "luff_mm": 6300,
+      "foot_mm": 5000,
+      "head_mm": 2600,
+      "head_droop_deg": 14,
+      "roach_mm": 550,
+      "battens": 9,
+      "balance": 0.2,
+      "boom_height_mm": 450,
+      "camber": 0.05,
+      "panel_sag": 0.025,
+      "sheet_angle_deg": 18
+    }
+  },
+  "scene": {
+    "sun_elevation_deg": 14,
+    "sun_azimuth_deg": 215,
+    "draft_fraction": 0.42,
+    "wave_strength": 1.0,
+    "heading_deg": 18,
+    "offshore_m": 14
+  }
+}

@@ -11,7 +11,9 @@
     "report": "vite-node scripts/report.ts",
     "views": "vite-node scripts/views.ts",
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "scene": "vite --config vite.scene.config.ts",
+    "build:scene": "vite build --config vite.scene.config.ts"
   },
   "dependencies": {
     "@types/three": "^0.185.4",

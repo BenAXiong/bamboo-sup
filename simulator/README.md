@@ -73,3 +73,22 @@ each one: culm mass is distributed along the length in proportion to local
 diameter (constant wall thickness), cross-members sit on the bundle crown, and
 lashings wrap the bundle at axis height. Rider CG height comes from the load
 case and dominates every stability result.
+
+## Raft beauty scene
+
+A separate page, `scene/`, renders an Amis bamboo sailing raft (default:
+`designs/rafts/palafang.raft.json`) on a sea and beach for visual exploration.
+
+```sh
+npm run scene        # dev server
+npm run build:scene  # static build in out/scene
+```
+
+Code lives in `src/scene/`: `raftSpec.ts` (spec types), `raft/` (culms,
+crossbeams, rattan lashings, rails, keels, oar posts, mast and sail),
+`environment.ts` (sky, water, beach, hills) and `textures.ts` (all surfaces are
+procedural; no image assets). It uses the physics module's `buildBend` for the
+bow but nothing else from physics, and physics never imports it.
+
+`?view=hero|side|bow|deck|lashing|sail|beach|aerial` picks a camera;
+`?still` renders one frame without the panel, for screenshots.
