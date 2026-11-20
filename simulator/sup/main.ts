@@ -473,7 +473,11 @@ function redo(): void {
 // ---------------------------------------------------------------- URL, import, export
 function saveHash(): void {
   const enc = btoa(unescape(encodeURIComponent(JSON.stringify(spec))));
-  history.replaceState(null, "", `${location.pathname}${location.search}#s=${enc}`);
+  try {
+    history.replaceState(null, "", `${location.pathname}${location.search}#s=${enc}`);
+  } catch {
+    /* some embedded viewers refuse it; the board still works */
+  }
 }
 function loadFromHash(): SupSpec | null {
   const m = location.hash.match(/#s=(.+)$/);
