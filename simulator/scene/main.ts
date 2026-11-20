@@ -57,6 +57,7 @@ if (params.has("sailing")) {
   spec.rig.sail.camber = 0.065;
   spec.rig.sail.panel_sag = 0.01;
   spec.rig.sail.sheet_angle_deg = 24;
+  if (spec.oar_posts.oars) spec.oar_posts.oars.mode = "rowing";
 }
 
 // World placement: root (heading, position) -> bob (wave motion) -> raft (design frame, mm).

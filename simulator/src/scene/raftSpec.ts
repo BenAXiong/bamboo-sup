@@ -132,7 +132,22 @@ export interface OarPostSpec {
   /** Unused since the brace rebuild; kept so older specs still load. */
   splay_deg: number;
   /** Oars: one per post, stowed between the branches, blade raised outboard. */
-  oars: { enabled: boolean; length_mm: number; blade_length_mm: number; blade_width_mm: number; shaft_diameter_mm: number; elevation_deg: number };
+  oars: {
+    enabled: boolean;
+    length_mm: number;
+    blade_length_mm: number;
+    blade_width_mm: number;
+    shaft_diameter_mm: number;
+    /** Unused since the oar poses below; kept so older specs still load. */
+    elevation_deg: number;
+    /**
+     * "stowed": shaft resting in the pin's grommet, blade propped inside the
+     * raft on the deck, handle out over the rail (how the crew leaves them
+     * ashore). "rowing": shaft out over the rail against the thole pin,
+     * sloping down and aft, blade in the water.
+     */
+    mode?: "stowed" | "rowing";
+  };
 }
 
 export interface SailSpec {

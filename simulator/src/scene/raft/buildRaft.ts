@@ -465,17 +465,43 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
         // Oar.
         const OA = O.oars;
         if (OA?.enabled) {
-          // Stowed fore and aft, resting on the log beside the branches, handle
-          // aft on the deck, blade raised forward (as in the rigged photo).
-          const el = (OA.elevation_deg * (0.85 + 0.3 * rand()) * Math.PI) / 180;
-          const yaw = side * (0.03 + 0.05 * rand());
-          const dir = new Vector3(Math.cos(el) * Math.cos(yaw), -Math.cos(el) * Math.sin(yaw), Math.sin(el)).normalize();
+          // The shaft passes through a rattan grommet on the thole pin, about
+          // 22 cm above the log. Ashore the blade is propped inside the raft on
+          // the deck; under way the oar works over the rail, blade in the water.
           const rs0 = OA.shaft_diameter_mm / 2;
-          const pivot = new Vector3(x + 20, c.y - side * (28 + rs0), logTop + rs0);
-          const tDeck = (pivot.z - (deckZ + rs0)) / dir.z;
-          const handle = pivot.clone().addScaledVector(dir, -tDeck);
+          const gromZ = logTop + 220;
+          // Where the leaning pin is at grommet height; the shaft passes just forward of it.
+          const pinAt = new Vector3(x, c.y + side * Math.tan(tilt) * (gromZ - (logTop - 60)), gromZ);
+          const pivot = pinAt.clone().add(new Vector3(24 + rs0, 0, 0));
+          const rowing = OA.mode === "rowing";
+          let dir: Vector3; // from the handle toward the blade
+          let tPivot: number; // distance from the handle to the pivot
+          if (rowing) {
+            // Outboard and aft, sloping down so the blade centre sits ~15 cm deep.
+            const waterZ = Math.min(...hull.map((cp) => Math.min(...cp.pts.map((q, k) => q.z - cp.r[k]!)))) + 105;
+            tPivot = OA.length_mm * 0.3;
+            const reach = OA.length_mm - tPivot - OA.blade_length_mm * 0.5;
+            const drop = Math.min(0.95, (pivot.z - waterZ + 150) / reach);
+            const el = Math.asin(drop);
+            const yawAft = ((40 + 12 * rand()) * Math.PI) / 180;
+            dir = new Vector3(-Math.cos(el) * Math.sin(yawAft) * 1, side * Math.cos(el) * Math.cos(yawAft), -drop).normalize();
+          } else {
+            // Blade end runs forward and inboard down to the deck mat; the
+            // handle rises aft and outboard beyond the pin.
+            tPivot = OA.length_mm * 0.3;
+            const reach = OA.length_mm - tPivot - 40;
+            const drop = Math.min(0.5, (pivot.z - (deckZ + 30)) / reach);
+            const el = Math.asin(drop);
+            const yawIn = ((20 + 8 * rand()) * Math.PI) / 180;
+            dir = new Vector3(Math.cos(el) * Math.cos(yawIn), -side * Math.cos(el) * Math.sin(yawIn), -drop).normalize();
+          }
+          const handle = pivot.clone().addScaledVector(dir, -tPivot);
           const tip = handle.clone().addScaledVector(dir, OA.length_mm);
           const bladeStart = tip.clone().addScaledVector(dir, -OA.blade_length_mm);
+          // Grommet: a few loose rattan turns around pin and shaft together.
+          lashingGeoms.push(
+            bundleRing([{ c: pinAt, r: 22 }, { c: pivot.clone(), r: rs0 }], new Vector3(0, 0, 1), 3, rand, 3),
+          );
           const rs = OA.shaft_diameter_mm / 2;
           const spts = straight(handle, bladeStart, (t) => rs * (t < 0.08 ? 0.85 : 1) * (1 + 0.1 * t), 10);
           oarGeoms.push(sweepTube(spts, { radial: 12, uOffset: rand(), caps: true }));
@@ -490,8 +516,10 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
             bp.push({ p: bladeStart.clone().lerp(tip, t), r: w });
             aspect.push(Math.max(thick / w, 0.06));
           }
-          // Build the blade so its wide axis is along x (fore and aft).
-          oarGeoms.push(bladeGeometry(bp, aspect, new Vector3(1, 0, 0)));
+          // Ashore the blade lies flat on the deck; under way it stands on edge
+          // to the water so it bites.
+          const wide = rowing ? new Vector3(0, 0, 1) : new Vector3().crossVectors(new Vector3(0, 0, 1), dir);
+          oarGeoms.push(bladeGeometry(bp, aspect, wide));
           lashingGeoms.push(rattanSeizing({ centre: handle.clone().addScaledVector(dir, 120), axis: dir, r: rs * 0.85 + 2 }, 3));
         }
       }
