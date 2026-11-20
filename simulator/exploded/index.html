@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Raft exploded view</title>
+    <style>
+      :root {
+        --bg-top: #eceae6; --bg-bottom: #c9c6c0; --ink: #1d1f22; --muted: #5b5f66;
+        --card: rgba(255, 255, 255, 0.82); --line: rgba(0, 0, 0, 0.1); --accent: #b5651d;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg-top: #2a2c30; --bg-bottom: #121315; --ink: #eceae6; --muted: #a3a7ad;
+          --card: rgba(24, 26, 29, 0.85); --line: rgba(255, 255, 255, 0.12); --accent: #e09a52;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg-top: #2a2c30; --bg-bottom: #121315; --ink: #eceae6; --muted: #a3a7ad;
+        --card: rgba(24, 26, 29, 0.85); --line: rgba(255, 255, 255, 0.12); --accent: #e09a52;
+        color-scheme: dark;
+      }
+      html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg-bottom); color: var(--ink);
+        font: 13px/1.45 system-ui, -apple-system, sans-serif; }
+      body { background: linear-gradient(var(--bg-top), var(--bg-bottom)); }
+      canvas#scene { display: block; width: 100%; height: 100%; touch-action: none; }
+      .lil-gui.root { --width: 270px; max-height: calc(100% - 20px); }
+      #info { position: fixed; left: 16px; bottom: 16px; max-width: min(380px, calc(100% - 32px));
+        background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+        backdrop-filter: blur(6px); }
+      #info h2 { margin: 0 0 2px; font-size: 15px; }
+      #info .sub { color: var(--muted); }
+      #info .hint { color: var(--muted); font-size: 12px; }
+      @media (max-width: 600px) { .lil-gui.root { --width: 220px; } #info { font-size: 12px; } }
+      body.still #info, body.still .lil-gui { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="info"><h2>Palafang raft, exploded</h2><div class="hint">Click a part to identify it. Drag to orbit, scroll or pinch to zoom.</div></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -13,7 +13,9 @@
     "dev": "vite",
     "build": "vite build",
     "scene": "vite --config vite.scene.config.ts",
-    "build:scene": "vite build --config vite.scene.config.ts"
+    "build:scene": "vite build --config vite.scene.config.ts",
+    "exploded": "vite --config vite.exploded.config.ts",
+    "build:exploded": "vite build --config vite.exploded.config.ts"
   },
   "dependencies": {
     "@types/three": "^0.185.4",

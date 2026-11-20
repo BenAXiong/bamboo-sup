@@ -63,6 +63,10 @@ interface Bar {
 }
 
 
+/** Assemblies the raft is built from, in building order. */
+export const ASSEMBLIES = ["hull", "keels", "beams", "rails", "deck", "oarposts", "oars", "rig"] as const;
+export type Assembly = (typeof ASSEMBLIES)[number];
+
 export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   const group = new Group();
   group.name = spec.id;
@@ -85,7 +89,15 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
       beamGuess.push(sB <= straightLen ? sB : straightLen + (sB - straightLen) * 0.85);
     }
   }
+  // Every mesh is tagged with the assembly it belongs to (userData.assembly),
+  // so the exploded viewer can move, hide or replace assemblies one at a time.
+  let asm: Assembly = "hull";
+  const tag = (next: Assembly) => {
+    for (const ch of group.children) ch.userData["assembly"] ??= asm;
+    asm = next;
+  };
   const { hull, rRef } = buildHull(spec, rand, mats, group, beamGuess);
+  tag("beams");
   const rCentre = rRef;
 
   // ------------------------------------------------------------- crossbeams
@@ -95,8 +107,17 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   const C = spec.crossbeams;
   const centre = hull[Math.round(half)]!;
   const rb = C.diameter_mm / 2;
-  const lashingGeoms: BufferGeometry[] = [];
-  const stickGeoms: BufferGeometry[] = [];
+  // Lashings and sticks are merged per assembly at the end.
+  const lashBy = new Map<Assembly, BufferGeometry[]>();
+  const stickBy = new Map<Assembly, BufferGeometry[]>();
+  const collector = (by: Map<Assembly, BufferGeometry[]>) => ({
+    push: (...g: BufferGeometry[]) => {
+      if (!by.has(asm)) by.set(asm, []);
+      by.get(asm)!.push(...g);
+    },
+  });
+  const lashingGeoms = collector(lashBy);
+  const stickGeoms = collector(stickBy);
   const spots: Record<string, Vector3> = {};
   const halfW = (hull[0]!.pts[0]!.y - hull[N - 1]!.pts[0]!.y) / 2 + 80;
 
@@ -176,6 +197,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   }
   const allBars = [...beams, ...bowBars].sort((a, b) => a.x - b.x);
 
+  tag("rails");
   // ---------------------------------------------------------------- rails
   // One thin culm per side, laid on the beam ends right above the outer hull
   // culm. Big rattan rings gather outer culm, beam end and rail at each beam,
@@ -228,6 +250,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     }
   }
 
+  tag("keels");
   // ---------------------------------------------------------------- keels
   // Three culms under each outer culm toward the stern, stacked in a
   // triangle (two side by side under the hull, one below them), forward ends
@@ -297,6 +320,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     }
   }
 
+  tag("deck");
   // ---------------------------------------------------------------- deck mats
   // Separate woven split-bamboo panels laid on the culms between crossbeams,
   // stopping a culm or two short of each edge, framed by lengthwise sticks.
@@ -366,6 +390,7 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     }
   }
 
+  tag("oarposts");
   // ---------------------------------------------------------------- oar posts and oars
   // Each post: a hollowed-out log fitted over the rail, two branches set in
   // holes inside it (splayed fore and aft, leaning outboard), each branch held
@@ -381,65 +406,76 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     O.stations_fraction.forEach((f, si) => {
       for (const rail of rails) {
         const side = rail.side;
-        const x = H.length_mm * f + signed(rand) * 80;
+        // Post body (Ben's sketch of photo 23): a long hewn timber, roughly
+        // square, hollowed along its underside and threaded onto the rail,
+        // which shows at both end faces. One end sits right against a crossbeam.
+        const ll = O.log_length_mm * (0.95 + 0.1 * rand());
+        const want = H.length_mm * f;
+        const railY = rail.at(want).p.y;
+        let beamEdge = want - ll / 2;
+        let best = Infinity;
+        for (const bm of beams) {
+          const bx = bm.xAt(railY);
+          if (Math.abs(bx - want) < best) {
+            best = Math.abs(bx - want);
+            beamEdge = bx + bm.r + 15;
+          }
+        }
+        const x = beamEdge + ll / 2;
         const rp = rail.at(x);
-        // Hewn, roughly squared log lying along the rail, hollowed underneath to sit over it.
-        const c = rp.p.clone().add(new Vector3(0, side * 8, rp.r * 0.45 + lr * 0.8));
-        const ll = O.log_length_mm * (0.9 + 0.2 * rand());
-        const lpts = straight(c.clone().add(new Vector3(-ll / 2, 0, 0)), c.clone().add(new Vector3(ll / 2, 0, 0)), (t) => lr * (1 + 0.04 * Math.sin(t * 7 + si)), 10);
+        const bw = O.log_diameter_mm * 0.8; // across
+        const bh = O.log_diameter_mm; // tall
+        // Rail runs through the lower third of the body.
+        const c = rp.p.clone().add(new Vector3(0, 0, bh * 0.22));
+        const lr = bh / 2;
+        const lpts = straight(c.clone().add(new Vector3(-ll / 2, 0, 0)), c.clone().add(new Vector3(ll / 2, 0, 0)), (t) => lr * (1 + 0.03 * Math.sin(t * 7 + si)), 12);
         logGeoms.push(
           sweepTube(lpts, {
-            radial: 28,
+            radial: 32,
             uOffset: rand(),
             caps: true,
-            // Squared section, a little taller than wide, with axe-flattened faces.
-            shape: (_i, th) => (1 + 0.16 * Math.cos(4 * th + 0.785)) * (1 - 0.1 * Math.cos(2 * th)),
+            // Hewn box: a superellipse, wider than a circle at the corners,
+            // narrower across than tall, with uneven axe-flattened faces.
+            // th = 0 is up, th = 90 deg is sideways for a tube along x.
+            shape: (i, th) => {
+              const k = 5;
+              const asp = bw / bh;
+              const rr = Math.pow(Math.pow(Math.abs(Math.cos(th)), k) + Math.pow(Math.abs(Math.sin(th)) / asp, k), -1 / k);
+              return rr * (1 + 0.025 * Math.sin(th * 5 + i * 0.7));
+            },
           }),
         );
         const logTop = c.z + lr * 0.95;
-        // Log bound to rail and outer culm near both ends.
-        for (const dx of [-ll / 2 + 90, ll / 2 - 90]) {
-          const q = rail.at(x + dx);
-          const oc = interpAtX(side > 0 ? hull[0]! : hull[N - 1]!, x + dx);
-          lashingGeoms.push(
-            bundleRing([{ c: q.p, r: q.r }, { c: c.clone().add(new Vector3(dx, 0, 0)), r: lr * 1.02 }, { c: oc.p.clone().setX(q.p.x), r: oc.r }], new Vector3(1, 0, 0), 5, rand, 2),
-          );
-        }
-        // Two brace branches set in holes in the log's inboard face, lying
-        // inboard across the culms, each tied down by two rattan knots
-        // (reference photos 22 and 23): one nearly square across, one raking.
-        const braces: { dx: number; ang: number; len: number }[] = [
-          { dx: -ll * 0.28, ang: (signed(rand) * 12 * Math.PI) / 180, len: 900 + rand() * 200 },
-          { dx: ll * 0.28, ang: ((side > 0 ? 1 : 1) * (38 + rand() * 10) * Math.PI) / 180, len: 1050 + rand() * 250 },
+        // Two sticks set in holes low in the inboard face, one near each end,
+        // running inboard across the culms, each tied to a culm by two rattan
+        // knots (sketch: blue sticks, green knots).
+        const braces: { dx: number; ang: number; len: number; knots: number[] }[] = [
+          { dx: -ll * 0.36, ang: ((8 + rand() * 10) * Math.PI) / 180, len: 850 + rand() * 150, knots: [0.32, 0.55] },
+          { dx: ll * 0.36, ang: (signed(rand) * 6 * Math.PI) / 180, len: 700 + rand() * 150, knots: [0.45, 0.92] },
         ];
         for (const br of braces) {
-          const start = new Vector3(x + br.dx, c.y - side * lr * 0.7, c.z - lr * 0.1);
-          // Direction: inboard (-side in y), raked by ang toward the bow.
+          const start = new Vector3(x + br.dx, c.y - side * bw * 0.35, c.z - bh * 0.12);
           const dir = new Vector3(Math.sin(br.ang), -side * Math.cos(br.ang), 0).normalize();
           const bpts: TubePoint[] = [];
           const seg = 16;
-          // A rigid branch: straight from its hole in the log down to where its
-          // far end rests on the culms, lifted only where a culm is in the way.
           const far = start.clone().addScaledVector(dir, br.len);
           const zEnd = matZ(hull, far.x, far.y) + 14 + 18;
           for (let j = 0; j <= seg; j++) {
             const t = j / seg;
-            const p = start.clone().addScaledVector(dir, -60 + (br.len + 60) * t);
-            const rr = 26 * (1 - 0.3 * t) * (1 + 0.1 * Math.sin(t * 13 + br.dx));
+            const p = start.clone().addScaledVector(dir, -40 + (br.len + 40) * t);
+            const rr = 24 * (1 - 0.25 * t) * (1 + 0.1 * Math.sin(t * 13 + br.dx));
             p.z = start.z + (zEnd - start.z) * Math.max(0, t);
             const clear = matZ(hull, p.x, p.y) + 10 + rr;
-            if (t > 0.1) p.z = Math.max(p.z, clear);
-            // Natural crooked branch: a slow bow plus a kink or two.
-            const crook = irr * 95 * (Math.sin(t * 3.1 + br.dx) * t + 0.45 * Math.sin(t * 7.3 + br.dx * 2) * t);
+            if (t > 0.08) p.z = Math.max(p.z, clear);
+            const crook = irr * 80 * (Math.sin(t * 3.1 + br.dx) * t + 0.4 * Math.sin(t * 7.3 + br.dx * 2) * t);
             p.x += -dir.y * crook;
             p.y += dir.x * crook;
             bpts.push({ p, r: rr });
           }
-          // Smooth the lifted spots so the branch stays stiff.
           for (let pass = 0; pass < 4; pass++)
             for (let j = 1; j < seg; j++) bpts[j]!.p.z = Math.max(bpts[j]!.p.z, (bpts[j - 1]!.p.z + bpts[j + 1]!.p.z) / 2);
           stickGeoms.push(sweepTube(bpts, { radial: 12, uOffset: rand(), caps: true }));
-          for (const t of [0.45, 0.85]) {
+          for (const t of br.knots) {
             const p = bpts[Math.round(t * seg)]!;
             const host = nearestCulmAtY(hull, p.p.x, p.p.y);
             const hc = host.p.clone();
@@ -531,11 +567,13 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     }
     if (oarGeoms.length) {
       const m = new Mesh(mergeGeometries(oarGeoms)!, mats.oar);
+      m.userData["assembly"] = "oars";
       m.castShadow = m.receiveShadow = true;
       group.add(m);
     }
   }
 
+  tag("rig");
   // ---------------------------------------------------------------- rig
   const G = spec.rig;
   if (G.enabled) {
@@ -614,15 +652,17 @@ export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
     }
   }
 
-  if (stickGeoms.length) {
-    const m = new Mesh(mergeGeometries(stickGeoms)!, mats.branch);
+  tag("rig");
+  for (const [a, gs] of stickBy) {
+    const m = new Mesh(mergeGeometries(gs)!, mats.branch);
+    m.userData["assembly"] = a;
     m.castShadow = m.receiveShadow = true;
     group.add(m);
   }
-
   // ---------------------------------------------------------------- nodes + lashings
-  if (lashingGeoms.length) {
-    const m = new Mesh(mergeGeometries(lashingGeoms)!, mats.rattan);
+  for (const [a, gs] of lashBy) {
+    const m = new Mesh(mergeGeometries(gs)!, mats.rattan);
+    m.userData["assembly"] = a;
     m.castShadow = true;
     m.receiveShadow = true;
     group.add(m);

@@ -76,8 +76,8 @@
     ],
     "height_mm": 900,
     "outward_tilt_deg": 12,
-    "log_length_mm": 720,
-    "log_diameter_mm": 190,
+    "log_length_mm": 1000,
+    "log_diameter_mm": 200,
     "splay_deg": 13,
     "oars": {
       "enabled": true,
