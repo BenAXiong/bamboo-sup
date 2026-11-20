@@ -17,7 +17,9 @@
     "exploded": "vite --config vite.exploded.config.ts",
     "build:exploded": "vite build --config vite.exploded.config.ts",
     "hut": "vite --config vite.hut.config.ts",
-    "build:hut": "vite build --config vite.hut.config.ts"
+    "build:hut": "vite build --config vite.hut.config.ts",
+    "sup": "vite --config vite.sup.config.ts",
+    "build:sup": "vite build --config vite.sup.config.ts"
   },
   "dependencies": {
     "@types/three": "^0.185.4",

@@ -15,5 +15,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "viewer/**/*.ts", "scene/**/*.ts", "exploded/**/*.ts", "hut/**/*.ts", "scripts/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts", "viewer/**/*.ts", "scene/**/*.ts", "exploded/**/*.ts", "sup/**/*.ts", "hut/**/*.ts", "scripts/**/*.ts"]
 }

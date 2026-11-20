@@ -1,0 +1,61 @@
+{
+  "spec_version": 1,
+  "id": "SUP-B01",
+  "name": "Bamboo SUP, six-culm baseline",
+  "notes": "Visual and layout spec for a one-person bamboo stand-up paddleboard, drawn with the raft generator (culms, crossbeams, rattan). Sizes follow the SUP-001 baseline (6 culms, 3.2 m, 350 mm bow rise over 0.9 m), with butts raised to 135 mm so an 80 kg rider keeps the culm tops near the waterline, with Ben's outer-largest girth spread. Edit live in the SUP viewer (npm run sup) and export back here.",
+  "seed": 11,
+  "board": {
+    "culm_count": 6,
+    "length_mm": 3200,
+    "diameter_base_mm": 135,
+    "taper": 0.8,
+    "size_spread": 1.2,
+    "largest": "outside",
+    "gap_mm": 6,
+    "stern_stagger_mm": 60
+  },
+  "bow": {
+    "rise_mm": 350,
+    "curve_length_mm": 900,
+    "sharpness": 2.0,
+    "cup": 0.1,
+    "tuck": 0.18,
+    "tip_binding": true,
+    "bow_bar": false
+  },
+  "frame": {
+    "count": 3,
+    "first_from_stern_mm": 260,
+    "last_from_bow_mm": 1000,
+    "diameter_mm": 42,
+    "overhang_mm": 40
+  },
+  "lashing": {
+    "material": "rattan",
+    "wraps": 3
+  },
+  "deck": {
+    "style": "slats",
+    "from_fraction": 0.3,
+    "to_fraction": 0.62,
+    "slat_width_mm": 40,
+    "slat_gap_mm": 14
+  },
+  "natural": {
+    "crookedness": 0.35,
+    "irregularity": 0.45,
+    "ovality": 0.05,
+    "cracks": 0.35,
+    "scorch": 0.55,
+    "node_spacing_mm": 340
+  },
+  "extras": {
+    "tail_loop": true
+  },
+  "load": {
+    "rider_kg": 80,
+    "rider_fraction": 0.4,
+    "water": "fresh",
+    "bamboo_density": 650
+  }
+}

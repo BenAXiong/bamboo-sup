@@ -34,7 +34,9 @@ def parse_args():
     p.add_argument("export_dir")
     p.add_argument("assets_dir")
     p.add_argument("out_dir")
-    p.add_argument("--set", default="beach", choices=["beach", "sea"])
+    p.add_argument("--set", default="beach", choices=["beach", "sea", "studio"])
+    p.add_argument("--anim-frames", type=int, default=0, help="studio: render the assembly animation over this many frames (24 fps)")
+    p.add_argument("--frames", default=None, help="only render these frames, e.g. 1-72 or 1,12,24")
     p.add_argument("--views", default="hero")
     p.add_argument("--samples", type=int, default=256)
     p.add_argument("--res", default="1920x1080")
@@ -694,7 +696,7 @@ def main():
     cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
     rig.location.x -= cx
     rig.location.y -= cy
-    if a.set == "beach":
+    if a.set in ("beach", "studio"):
         # Hull bottom resting on (and pressed a little into) the sand.
         hull_z = min(zs)
         rig.location.z -= hull_z + 0.025
@@ -744,6 +746,9 @@ def main():
     if a.set == "beach":
         img = hdri_world(os.path.join(a.assets_dir, "hdri", "spiaggia_di_mondello_4k.hdr"), rotation_deg=0, strength=1.0)
         sand_ground(S, a.assets_dir)
+    elif a.set == "studio":
+        img = hdri_world(os.path.join(a.assets_dir, "hdri", "spiaggia_di_mondello_4k.hdr"), rotation_deg=0, strength=1.0)
+        studio_backdrop()
     else:
         img = hdri_world(os.path.join(a.assets_dir, "hdri", "qwantani_afternoon_puresky_4k.hdr"), rotation_deg=0, strength=1.0)
         ocean_surface()
@@ -794,6 +799,9 @@ def main():
     os.makedirs(a.out_dir, exist_ok=True)
     if a.save_blend:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(a.out_dir, f"raft_{a.set}.blend"))
+    if a.anim_frames > 0:
+        render_assembly(a, sc, cam, cam_data, imported, set_sun, default_sun)
+        return
     for name in a.views.split(","):
         v = views[name]
         cam.location = Vector(v["pos"])
@@ -808,6 +816,125 @@ def main():
         sc.render.filepath = os.path.join(a.out_dir, f"{a.set}_{name}.png")
         bpy.ops.render.render(write_still=True)
         print("rendered", name, flush=True)
+
+
+# ----------------------------------------------------------------------------- studio + animation
+
+STUDIO_BG = (0.50, 0.48, 0.45)
+
+
+def studio_backdrop():
+    """Seamless warm-grey studio: the camera sees a flat backdrop, the raft is
+    still lit by the sky HDRI, and a matte floor catches its shadow."""
+    world = bpy.context.scene.world
+    nt = world.node_tree
+    out = [n for n in nt.nodes if n.bl_idname == "ShaderNodeOutputWorld"][0]
+    bg = [n for n in nt.nodes if n.bl_idname == "ShaderNodeBackground"][0]
+    N = Nodes.__new__(Nodes)  # add to the existing tree without clearing it
+    N.nt = nt
+    N.x = 0
+    lp = N.new("ShaderNodeLightPath")
+    flat = N.new("ShaderNodeBackground")
+    flat.inputs["Color"].default_value = (*STUDIO_BG, 1)
+    flat.inputs["Strength"].default_value = 1.0
+    mix = N.new("ShaderNodeMixShader")
+    N.link(lp.outputs["Is Camera Ray"], mix.inputs["Fac"])
+    N.link(bg.outputs[0], mix.inputs[1])
+    N.link(flat.outputs[0], mix.inputs[2])
+    N.link(mix.outputs[0], out.inputs["Surface"])
+    bpy.ops.mesh.primitive_plane_add(size=400, location=(0, 0, 0))
+    floor = bpy.context.active_object
+    floor.name = "Floor"
+    m = bpy.data.materials.new("Floor")
+    F = Nodes(m)
+    fo = F.new("ShaderNodeOutputMaterial")
+    fb = F.new("ShaderNodeBsdfPrincipled")
+    fb.inputs["Base Color"].default_value = (STUDIO_BG[0] * 0.95, STUDIO_BG[1] * 0.95, STUDIO_BG[2] * 0.95, 1)
+    fb.inputs["Roughness"].default_value = 0.9
+    F.link(fb.outputs[0], fo.inputs["Surface"])
+    floor.data.materials.append(m)
+    # Shadow catcher on a transparent film: frames are composited over the
+    # flat backdrop afterwards, so there is no horizon line.
+    floor.is_shadow_catcher = True
+    bpy.context.scene.render.film_transparent = True
+
+
+# Build order and exploded heights (m), as in the exploded web viewer.
+ORDER = ["hull", "keels", "beams", "rails", "deck", "oarposts", "oars", "rig"]
+OFFSET = {"keels": -1.0, "hull": 0.0, "beams": 0.8, "rails": 1.5, "deck": 2.2, "oarposts": 3.0, "oars": 3.8, "rig": 5.0}
+
+
+def assembly_of(o):
+    p = o
+    while p is not None:
+        if "assembly" in p.keys():
+            return p["assembly"]
+        p = p.parent
+    return None
+
+
+def render_assembly(a, sc, cam, cam_data, imported, set_sun, default_sun):
+    """Layers drop onto the hull one after another while the camera orbits."""
+    n = a.anim_frames
+    empties = {}
+    for k in ORDER:
+        e = bpy.data.objects.new("asm_" + k, None)
+        sc.collection.objects.link(e)
+        empties[k] = e
+    # Keels lie below the floor when exploded: lift the whole stack so they clear it.
+    lift = -OFFSET["keels"] + 0.15
+    for o in imported:
+        k = o.get("assembly") if "assembly" in o.keys() else None
+        if k not in empties:
+            continue
+        mw = o.matrix_world.copy()
+        o.parent = empties[k]
+        o.matrix_world = mw
+    ease = lambda t: 0.0 if t <= 0 else 1.0 if t >= 1 else t * t * (3 - 2 * t)
+    hold_end = 0.18  # last part of the clip shows the finished raft
+    for f in range(1, n + 1):
+        T = (f - 1) / max(1, n - 1) / (1 - hold_end)
+        for i, k in enumerate(ORDER):
+            # Each layer arrives in turn; later ones start before earlier ones land.
+            local = ease((T - i * 0.085) / 0.36)
+            amt = 1.0 - local
+            # The whole raft settles down onto the floor at the very end.
+            e = empties[k]
+            e.location = (0, 0, OFFSET[k] * amt + lift * (1 - ease(T / 0.7)))
+            e.keyframe_insert("location", frame=f)
+    # Camera: slow 20 degree orbit, framing the exploded stack and then the raft.
+    tgt0, tgt1 = Vector((0.0, 0.0, 6.6)), Vector((-0.3, 0.0, 3.4))
+    r0, r1 = 27.0, 15.0
+    for f in range(1, n + 1):
+        u = (f - 1) / max(1, n - 1)
+        ue = ease(u)
+        ang = math.radians(38 - 20 * u)
+        r = r0 + (r1 - r0) * ue
+        tgt = tgt0.lerp(tgt1, ue)
+        cam.location = (r * math.cos(ang), r * math.sin(ang), 2.0 + 2.5 * (1 - ue))
+        cam.rotation_euler = (tgt - cam.location).to_track_quat("-Z", "Y").to_euler()
+        cam.keyframe_insert("location", frame=f)
+        cam.keyframe_insert("rotation_euler", frame=f)
+    cam_data.lens = 35
+    cam_data.dof.use_dof = False
+    set_sun(a.sun_az if a.sun_az is not None else 60)
+    sc.frame_start, sc.frame_end = 1, n
+    sc.render.fps = 24
+    frames = list(range(1, n + 1))
+    if a.frames:
+        frames = []
+        for part in a.frames.split(","):
+            if "-" in part:
+                lo, hi = part.split("-")
+                frames += list(range(int(lo), int(hi) + 1))
+            else:
+                frames.append(int(part))
+    os.makedirs(a.out_dir, exist_ok=True)
+    for f in frames:
+        sc.frame_set(f)
+        sc.render.filepath = os.path.join(a.out_dir, f"frame_{f:04d}.png")
+        bpy.ops.render.render(write_still=True)
+        print("rendered frame", f, flush=True)
 
 
 def camera_views(set_name, rig):
