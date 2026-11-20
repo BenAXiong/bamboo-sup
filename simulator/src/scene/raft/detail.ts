@@ -135,9 +135,12 @@ export function rattanLashing(
   upper: Member,
   wraps: number,
   rand: () => number,
+  opts: { seg?: number; tail?: boolean; scale?: number } = {},
 ): BufferGeometry {
   const geoms: BufferGeometry[] = [];
   const w = Math.max(1, Math.round(wraps));
+  const SW = STRIP_W * (opts.scale ?? 1);
+  const ST = STRIP_T * (opts.scale ?? 1);
   const up = new Vector3().subVectors(upper.centre, lower.centre).normalize();
   const flat = (v: Vector3) => v.clone().sub(up.clone().multiplyScalar(v.dot(up))).normalize();
   const la = flat(lower.axis);
@@ -148,8 +151,8 @@ export function rattanLashing(
   const planes: Vector3[] = parallel
     ? [across]
     : [la.clone().add(ua).normalize(), la.clone().sub(ua).normalize()];
-  const gap = STRIP_W * 1.02;
-  const lift = STRIP_T * 0.55;
+  const gap = SW * 1.02;
+  const lift = ST * 0.55;
 
   planes.forEach((h, set) => {
     const q = new Vector3().crossVectors(up, h).normalize(); // stacking direction
@@ -161,10 +164,10 @@ export function rattanLashing(
     const kL = semi(lower);
     for (let k = 0; k < w; k++) {
       const offset = (k - (w - 1) / 2) * gap + (rand() - 0.5) * 1.5;
-      const layer = set * STRIP_T * 0.9; // second set rides over the first
+      const layer = set * ST * 0.9; // second set rides over the first
       const pts: Vector3[] = [];
       const norms: Vector3[] = [];
-      const seg = 80;
+      const seg = opts.seg ?? 80;
       for (let j = 0; j <= seg; j++) {
         const th = (j / seg) * Math.PI * 2;
         const c = Math.cos(th);
@@ -181,16 +184,17 @@ export function rattanLashing(
         pts.push(p);
         norms.push(h.clone().multiplyScalar(c / kk).addScaledVector(up, s).normalize());
       }
-      geoms.push(sweepRibbon(pts, STRIP_W * (0.9 + 0.2 * rand()), STRIP_T, (i) => norms[i]!));
+      geoms.push(sweepRibbon(pts, SW * (0.9 + 0.2 * rand()), ST, (i) => norms[i]!));
     }
   });
 
+  if (opts.tail === false) return mergeGeometries(geoms)!;
   // Tail: the free end tucked under the last turn, lying flat along the top.
   const h0 = planes[0]!;
   const q0 = new Vector3().crossVectors(up, h0).normalize();
   const tailBase = upper.centre
     .clone()
-    .addScaledVector(up, upper.r + lift + STRIP_T * 2)
+    .addScaledVector(up, upper.r + lift + ST * 2)
     .addScaledVector(q0, ((w - 1) / 2) * gap);
   const tail: Vector3[] = [];
   const tailUp: Vector3[] = [];
@@ -202,15 +206,15 @@ export function rattanLashing(
     const ang = s / (upper.r + lift);
     const p = upper.centre
       .clone()
-      .addScaledVector(up, Math.cos(ang) * (upper.r + lift + STRIP_T * 1.6) + (j > 7 ? (j - 7) * 1.5 : 0))
-      .addScaledVector(h0, Math.sin(ang) * (upper.r + lift + STRIP_T * 1.6))
+      .addScaledVector(up, Math.cos(ang) * (upper.r + lift + ST * 1.6) + (j > 7 ? (j - 7) * 1.5 : 0))
+      .addScaledVector(h0, Math.sin(ang) * (upper.r + lift + ST * 1.6))
       .addScaledVector(q0, ((w - 1) / 2) * gap + 4)
       .addScaledVector(ta, 0);
     tail.push(p);
     tailUp.push(up.clone().multiplyScalar(Math.cos(ang)).addScaledVector(h0, Math.sin(ang)).normalize());
   }
   void tailBase;
-  geoms.push(sweepRibbon(tail, STRIP_W * 0.85, STRIP_T, (i) => tailUp[i]!));
+  geoms.push(sweepRibbon(tail, SW * 0.85, ST, (i) => tailUp[i]!));
 
   return mergeGeometries(geoms)!;
 }

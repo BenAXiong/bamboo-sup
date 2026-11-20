@@ -111,3 +111,12 @@ python blender/render_raft.py EXPORT_DIR OUT_DIR --views hero,rattan,knot,bow,ma
 ```
 
 On a 4-core cloud machine a 1600x900 still at 96 samples takes a few minutes.
+
+## Amis thatched house (exploded viewer)
+
+`npm run hut` (dev) / `npm run build:hut` (to `out/hut`). A small single-room
+Amis house (阿美族茅草屋, 單室平入型) generated from
+`designs/huts/amis-small.hut.json` by `src/scene/hut/buildHut.ts`, split into
+its building layers (floor, posts, frame, rafters, raina, thatch, ridge, walls,
+interior, door). URL params: `?explode=0..1`, `?play`, `?still`, `?view=front|side|top|eave`,
+`?isolate=<layer>`, `?fast`. Research and sources: `research/amis-hut/README.md`.

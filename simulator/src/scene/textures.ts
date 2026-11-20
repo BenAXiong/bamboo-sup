@@ -18,7 +18,7 @@ import { fbm, rng } from "./random.js";
 
 type Painter = (u: number, v: number) => [number, number, number];
 
-function paint(
+export function paint(
   w: number,
   h: number,
   painter: Painter,

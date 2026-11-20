@@ -1,0 +1,56 @@
+{
+  "id": "amis-small-hut",
+  "name": "Small Amis thatched house (單室平入型)",
+  "seed": 7,
+  "notes": "Single-room, door on the long side. Dimensions are estimates; see research/amis-hut/README.md.",
+  "plan": {
+    "length_mm": 4200,
+    "width_mm": 3000,
+    "bays": 3
+  },
+  "posts": {
+    "wall_height_mm": 1600,
+    "section_mm": [
+      180,
+      90
+    ],
+    "ridge_post_diameter_mm": 170,
+    "buried_mm": 500
+  },
+  "frame": {
+    "plate_diameter_mm": 115,
+    "tie_beam_diameter_mm": 100,
+    "ridge_diameter_mm": 125
+  },
+  "roof": {
+    "ridge_height_mm": 3300,
+    "eave_overhang_mm": 550,
+    "gable_overhang_mm": 420,
+    "rafter_spacing_mm": 500,
+    "rafter_diameter_mm": 65,
+    "lath_spacing_mm": 180,
+    "lath_culm_diameter_mm": 16,
+    "thatch_thickness_mm": 250,
+    "thatch_course_mm": 220,
+    "pressing_spacing_mm": 450
+  },
+  "walls": {
+    "thickness_mm": 110,
+    "stem_diameter_mm": 15,
+    "inner_cane_diameter_mm": 14,
+    "rail_heights_mm": [
+      180,
+      820,
+      1520
+    ]
+  },
+  "door": {
+    "width_mm": 800,
+    "height_mm": 1380,
+    "open_deg": 65
+  },
+  "interior": {
+    "platform_height_mm": 450,
+    "platform_depth_mm": 1050
+  }
+}
