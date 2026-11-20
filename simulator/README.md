@@ -74,6 +74,33 @@ diameter (constant wall thickness), cross-members sit on the bundle crown, and
 lashings wrap the bundle at axis height. Rider CG height comes from the load
 case and dominates every stability result.
 
+## Bamboo SUP designer
+
+A third page, `sup/`, builds a bamboo stand-up paddleboard with the raft
+generator's culms, crossbeams and rattan, and solves its hydrostatics live.
+Default spec: `designs/sup/sup-001.sup.json`.
+
+```sh
+npm run sup        # dev server
+npm run build:sup  # static build in out/sup
+```
+
+- `src/scene/sup/supSpec.ts`: the SUP spec, its mapping onto a `RaftSpec`
+  (rails, keels, oar posts and rig switched off) and the control list the
+  panel is generated from (groups, ranges, units, help text).
+- `src/scene/sup/buildSup.ts`: SUP-only parts (bow tip binding, split-bamboo
+  slat deck with side battens, tail rope loop) and `supDesign` /
+  `supConditions`, which turn the drawn hull into a hydrostatic `Design` so the
+  readout uses the culm sizes and positions on screen.
+- `src/scene/sup/presets.ts`: Baseline, Narrow 5-culm, Wide 7-culm, Dramatic bow.
+
+The panel has presets, grouped sliders with typed values, per-group and global
+reset, undo/redo (Ctrl+Z), JSON export/import, and the current board kept in
+the URL (`#s=...`) so a link reopens it. `?view=three-quarter|side|top|bow|lashing|tip`
+picks a camera, `?water` floats the board at its solved waterline, `?still`
+hides the UI for screenshots. Board mass is an estimate from culm wall area
+(wall 7.5% of diameter) and the density slider.
+
 ## Raft beauty scene
 
 A separate page, `scene/`, renders an Amis bamboo sailing raft (default:
