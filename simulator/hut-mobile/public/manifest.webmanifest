@@ -1,0 +1,9 @@
+{
+  "name": "阿美族茅草屋",
+  "short_name": "茅草屋",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#e9e4db",
+  "theme_color": "#e9e4db",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

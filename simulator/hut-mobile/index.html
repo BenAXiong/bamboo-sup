@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#e9e4db" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <title>阿美族茅草屋</title>
+    <style>
+      /* Layout: full-screen 3D stage; one bottom sheet holds every control within thumb reach. */
+      :root {
+        --stage: #e9e4db; --stage-2: #cfc6b8; --ink: #2a2118; --muted: #6d6153;
+        --sheet: rgba(250, 247, 241, 0.94); --line: rgba(60, 40, 20, 0.14);
+        --rattan: #a8742c; --rattan-ink: #ffffff; --chip: #efe8dc;
+        --font: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+        color-scheme: light;
+      }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+      body { background: linear-gradient(var(--stage), var(--stage-2)); color: var(--ink); font: 17px/1.5 var(--font); }
+      canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+      header { position: fixed; top: 0; left: 0; right: 0; pointer-events: none;
+        padding: calc(env(safe-area-inset-top, 0px) + 12px) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+      header h1 { margin: 0; font-size: 22px; letter-spacing: 0.04em; text-shadow: 0 1px 0 rgba(255,255,255,0.6); }
+      header .sub { font-size: 14px; color: var(--muted); }
+      header button { pointer-events: auto; }
+      .round { min-width: 48px; height: 48px; border-radius: 24px; border: 1px solid var(--line); background: var(--sheet);
+        color: var(--ink); font: 600 15px var(--font); padding: 0 14px; }
+
+      #hint { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); background: rgba(42, 33, 24, 0.78); color: #fff;
+        padding: 12px 18px; border-radius: 14px; font-size: 16px; text-align: center; pointer-events: none; transition: opacity 0.6s; max-width: 80vw; }
+
+      #sheet { position: fixed; left: 0; right: 0; bottom: 0; background: var(--sheet); border-top: 1px solid var(--line);
+        border-radius: 20px 20px 0 0; box-shadow: 0 -6px 24px rgba(40, 25, 10, 0.12); backdrop-filter: blur(8px);
+        padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(16px, env(safe-area-inset-left, 0px));
+        display: flex; flex-direction: column; gap: 12px; }
+      .row { display: flex; gap: 10px; align-items: center; }
+      .big { flex: 1; height: 56px; border-radius: 16px; border: none; font: 700 19px var(--font); background: var(--rattan); color: var(--rattan-ink); }
+      .big.alt { background: var(--chip); color: var(--ink); border: 1px solid var(--line); }
+      .big:active, .chip:active, .round:active { transform: scale(0.97); }
+      .slider { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; font-size: 15px; color: var(--muted); }
+      input[type=range] { width: 100%; height: 44px; accent-color: var(--rattan); }
+      input[type=range]::-webkit-slider-thumb { width: 34px; height: 34px; }
+      #chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+      #chips::-webkit-scrollbar { display: none; }
+      .chip { flex: 0 0 auto; height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid var(--line); background: var(--chip);
+        color: var(--ink); font: 600 16px var(--font); white-space: nowrap; }
+      .chip[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+      #card { position: fixed; left: 0; right: 0; bottom: 0; background: #fffdf8; border-radius: 20px 20px 0 0;
+        box-shadow: 0 -10px 30px rgba(40, 25, 10, 0.22); transform: translateY(105%); transition: transform 0.28s ease;
+        padding: 18px max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 20px) max(20px, env(safe-area-inset-left, 0px));
+        max-height: 60%; overflow-y: auto; }
+      #card.open { transform: none; }
+      #card h2 { margin: 0 52px 2px 0; font-size: 24px; }
+      #card .amis { color: var(--rattan); font-weight: 700; font-size: 18px; }
+      #card .part { margin-top: 6px; font-size: 16px; color: var(--muted); }
+      #card p { margin: 10px 0 0; font-size: 18px; }
+      #card .close { position: absolute; top: 12px; right: max(14px, env(safe-area-inset-right, 0px)); }
+      :focus-visible { outline: 3px solid var(--rattan); outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) { #card, #hint { transition: none; } }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <header>
+      <div><h1 id="title">阿美族茅草屋</h1><div class="sub" id="subtitle">單室平入型 · 拆開看每一層</div></div>
+      <button class="round" id="lang" type="button" aria-label="Language">EN</button>
+    </header>
+    <div id="hint">一根手指轉動 · 兩根手指放大<br />點一下看名稱</div>
+    <section id="sheet" aria-label="Controls">
+      <div class="row">
+        <button class="big" id="build" type="button">▶ 蓋起來</button>
+        <button class="big alt" id="apart" type="button">拆開</button>
+      </div>
+      <label class="slider"><span id="lblTogether">合</span><input id="explode" type="range" min="0" max="100" value="60" aria-label="拆開程度" /><span id="lblApart">開</span></label>
+      <div id="chips" role="toolbar"></div>
+    </section>
+    <section id="card" aria-live="polite">
+      <button class="round close" id="close" type="button" aria-label="Close">✕</button>
+      <h2 id="cName"></h2>
+      <div class="amis" id="cAmis"></div>
+      <div class="part" id="cPart"></div>
+      <p id="cAbout"></p>
+    </section>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

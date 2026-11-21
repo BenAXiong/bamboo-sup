@@ -113,7 +113,15 @@ function ensureAttrs(g: BufferGeometry): BufferGeometry {
 const lin = (r: number, g: number, b: number): RGB => [(r / 255) ** 2.2, (g / 255) ** 2.2, (b / 255) ** 2.2];
 const mul = (c: RGB, k: number): RGB => [c[0] * k, c[1] * k, c[2] * k];
 
-export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
+export interface HutBuildOptions {
+  /** Phone detail level: fewer sides per member, lighter ties, fewer loose straws (about a third of the triangles). */
+  lite?: boolean;
+}
+
+export function buildHut(spec: HutSpec, mats: HutMaterials, opts: HutBuildOptions = {}): HutBuild {
+  const lite = !!opts.lite;
+  const Q = lite ? 0.4 : 1;
+  const S = (n: number) => (lite ? Math.max(10, Math.round(n * 0.45)) : n);
   const rand = rng(spec.seed);
   const sgn = () => rand() * 2 - 1;
   const col = new Collector();
@@ -213,7 +221,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
       const shade = k0 * (node ? 0.72 : 1) * (0.94 + 0.12 * noise1(f * 9, seed + 3));
       pts.push({ p: a.clone().addScaledVector(ax, s).add(off), r, color: mul(tint, shade) });
     }
-    return sweepTube(pts, { radial: o.radial ?? 12, caps: o.caps ?? true, uOffset: rand(), shape: o.shape });
+    return sweepTube(pts, { radial: lite ? Math.max(4, Math.round((o.radial ?? 12) * 0.6)) : (o.radial ?? 12), caps: o.caps ?? true, uOffset: rand(), shape: o.shape });
   };
   /** Superellipse section multiplier: half-extents (cos dir, sin dir) relative to the base radius. */
   const rectShape = (ac: number, as: number, p = 6) => (_i: number, th: number) => {
@@ -346,7 +354,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
     col.add("frame", "main", "timber", "Wall plate (falag)", pole(a, b, plateR, plateR * 0.85, { radial: 14, wobble: 10, tint: tint.timber }));
     for (const x of postXs) {
       col.add("frame", "main", "rattan", "Rattan lashing",
-        rattanLashing(member(new Vector3(x, s * (W / 2), tieZ), Y, tieR), member(new Vector3(x, s * (W / 2), plateZ), X, plateR), 3, rand));
+        rattanLashing(member(new Vector3(x, s * (W / 2), tieZ), Y, tieR), member(new Vector3(x, s * (W / 2), plateZ), X, plateR), 3, rand, { seg: S(80) }));
     }
   }
   {
@@ -380,10 +388,10 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
       // To the ridge and to the wall plate.
       const onRidge = P(s, x, rr * tanA * 0.3, rr);
       col.add("rafters", piece, "rattan", "Rattan lashing",
-        rattanLashing(member(new Vector3(x, 0, ridgeZ), X, ridgeR), member(onRidge, dS(s), rr), 2, rand, { seg: 32 }));
+        rattanLashing(member(new Vector3(x, 0, ridgeZ), X, ridgeR), member(onRidge, dS(s), rr), 2, rand, { seg: S(32) }));
       const tPlate = (W / 2) / cosA;
       col.add("rafters", piece, "rattan", "Rattan lashing",
-        rattanLashing(member(new Vector3(x, s * (W / 2), plateZ), X, plateR), member(P(s, x, tPlate, rr), dS(s), rr), 2, rand, { seg: 32 }));
+        rattanLashing(member(new Vector3(x, s * (W / 2), plateZ), X, plateR), member(P(s, x, tPlate, rr), dS(s), rr), 2, rand, { seg: S(32) }));
     }
   }
   col.setExplode("rafters", "front", ex(0, -500, 2400));
@@ -409,7 +417,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
       for (const x0 of rafterXs) {
         const x = rafterX(s, x0);
         col.add("raina", piece, "rattan", "Rattan tie",
-          rattanLashing(member(P(s, x, t, rr), dS(s), rr), member(P(s, x, t, 2 * rr + lr), X, lr * 1.9), 1, rand, { seg: 18, tail: false, scale: 0.65 }));
+          rattanLashing(member(P(s, x, t, rr), dS(s), rr), member(P(s, x, t, 2 * rr + lr), X, lr * 1.9), 1, rand, { seg: S(18), tail: false, scale: 0.65 }));
       }
     }
   }
@@ -503,7 +511,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
     g.computeVertexNormals();
     return g;
   };
-  const NX = Math.ceil((2 * xE) / 45);
+  const NX = Math.ceil((2 * xE) / (lite ? 80 : 45));
   const xi = (i: number) => -xE + (2 * xE * i) / NX;
 
   // Straw cards: thin tapered quads, two triangles each.
@@ -544,7 +552,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
     for (let k = 0; k < butts.length; k++) {
       const tb = butts[k]!;
       const tt = k + 1 < butts.length ? butts[k + 1]! : tTop;
-      const nt = Math.max(2, Math.ceil((tb - tt) / 30));
+      const nt = Math.max(2, Math.ceil((tb - tt) / (lite ? 55 : 30)));
       const vOff = k * 0.37;
       col.add("thatch", piece, "thatch", label, (s > 0 ? flip : (g: BufferGeometry) => g)(grid(NX, nt, (i, j) => {
         const x = xi(i);
@@ -566,7 +574,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
         return { p: P(s, x, bt + (j === 0 ? 4 : 0), o), uv: [x / 250, o / 250], c: surfCol(x, tb, j === 0 ? 0.95 : 1.25) };
       })));
       // Fringe of loose straws at the butt line.
-      const per = k === 0 ? 0.5 : 0.32; // straws per mm of roof length
+      const per = (k === 0 ? 0.5 : 0.32) * Q; // straws per mm of roof length
       const count = Math.round(2 * xE * per);
       for (let q = 0; q < count; q++) {
         const x = -xE + rand() * 2 * xE;
@@ -609,7 +617,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
       });
       col.add("thatch", piece, "thatch", label, e * s > 0 ? g : flip(g));
       // Ragged straws sticking out of the verge.
-      for (let q = 0; q < 700; q++) {
+      for (let q = 0; q < 700 * Q; q++) {
         const t = tTop + rand() * (tEave - tTop);
         const k = butts.findIndex((b, i) => t <= b && (i + 1 >= butts.length || t > butts[i + 1]!));
         const o = oBase + (oOut(s, Math.max(0, k), e * xE, t) - oBase) * rand();
@@ -669,7 +677,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
       col.add("ridge", "main", "thatchButt", "Ridge roll (folded cogon)", e > 0 ? g : flip(g));
     }
     for (const s of [-1, 1]) {
-      for (let q = 0; q < Math.round(2 * xE * 0.3); q++) {
+      for (let q = 0; q < Math.round(2 * xE * 0.3 * Q); q++) {
         const x = -xE + rand() * 2 * xE;
         const root = section(x, s * (0.97 - rand() * 0.05), -rand() * 25);
         const dir = dS(s).addScaledVector(X, sgn() * 0.3).addScaledVector(nS(s), sgn() * 0.1).normalize();
@@ -751,7 +759,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
     const rr2 = r + 1.5;
     const pts: Vector3[] = [];
     const nor: Vector3[] = [];
-    const seg = 28;
+    const seg = lite ? 12 : 28;
     for (let j = 0; j <= 2 * seg; j++) {
       const th = (j / seg) * Math.PI * 2;
       // Stadium round the two rails: half circle round b, straight, half circle round a.
@@ -893,7 +901,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
       pole(new Vector3(-jx - 60, yMid - 20, 35), new Vector3(jx + 60, yMid - 20, 35), 40, 38, { radial: 12, wobble: 3, tint: tint.timber }));
     for (const e of [-1, 1]) {
       col.add("door", "frame", "rattan", "Rattan lashing",
-        rattanLashing(member(new Vector3(e * jx, yMid, lz - 2 * jambR), Z, jambR), member(new Vector3(e * jx, yMid, lz), X, jambR), 3, rand, { seg: 48 }));
+        rattanLashing(member(new Vector3(e * jx, yMid, lz - 2 * jambR), Z, jambR), member(new Vector3(e * jx, yMid, lz), X, jambR), 3, rand, { seg: S(48) }));
     }
     // Door leaf: vertical arrow bamboo on three battens, hung on rattan rings from the left jamb.
     const open = (spec.door.open_deg * Math.PI) / 180;
@@ -919,7 +927,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
       for (let c = 60; c < leafW; c += 190) {
         const m = hinge.clone().addScaledVector(across, c).setZ(z);
         col.add("door", "leaf", "rattan", "Rattan tie",
-          rattanLashing(member(m, Z, 9), member(m.clone().addScaledVector(outward, 22), across, 14), 1, rand, { seg: 24, tail: false, scale: 0.7 }));
+          rattanLashing(member(m, Z, 9), member(m.clone().addScaledVector(outward, 22), across, 14), 1, rand, { seg: S(24), tail: false, scale: 0.7 }));
       }
     }
     // Hinge rings round the jamb and the first cane.
@@ -969,7 +977,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials): HutBuild {
     for (const y of [y0 + 70, y1 - 70]) {
       for (let x = -x1 + 30 + 49 * 2; x < x1 - 20; x += 49 * 4) {
         col.add("interior", "bed", "rattan", "Rattan tie",
-          rattanLashing(member(new Vector3(x, y, bz), X, bearerR), member(new Vector3(x, y, hP - 12), Y, 12), 1, rand, { seg: 28, tail: false, scale: 0.7 }));
+          rattanLashing(member(new Vector3(x, y, bz), X, bearerR), member(new Vector3(x, y, hP - 12), Y, 12), 1, rand, { seg: S(28), tail: false, scale: 0.7 }));
       }
     }
     // Hearth: three stones in an ash bed, with burnt-down firewood.
