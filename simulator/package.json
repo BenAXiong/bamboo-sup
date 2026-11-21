@@ -19,7 +19,7 @@
     "hut": "vite --config vite.hut.config.ts",
     "build:hut": "vite build --config vite.hut.config.ts",
     "hut:mobile": "vite --config vite.hut-mobile.config.ts",
-    "build:site": "vite build --config vite.hut-mobile.config.ts && vite build --config vite.hut.config.ts --outDir ../out/site/desktop --emptyOutDir false && vite build --config vite.exploded.config.ts --outDir ../out/site/raft --emptyOutDir false",
+    "build:site": "vite build --config vite.hut-mobile.config.ts && vite build --config vite.hut.config.ts --outDir ../out/site/desktop --emptyOutDir false && vite build --config vite.exploded.config.ts --outDir ../out/site/raft --emptyOutDir false && vite build --config vite.sup.config.ts --outDir ../out/site/sup --emptyOutDir false",
     "sup": "vite --config vite.sup.config.ts",
     "build:sup": "vite build --config vite.sup.config.ts"
   },

@@ -103,9 +103,25 @@
         padding: 7px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 5; }
       #toast.on { opacity: 1; }
 
+      .titlebar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      #fold { display: none; padding: 3px 10px; }
       @media (max-width: 760px) {
         #stage { inset: 0 0 52vh 0; }
-        #panel { top: auto; height: 52vh; width: 100%; border-left: 0; border-top: 1px solid var(--line); }
+        #panel { top: auto; height: 52vh; width: 100%; border-left: 0; border-top: 1px solid var(--line);
+          padding-bottom: env(safe-area-inset-bottom, 0px); }
+        #panel header { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+        #fold { display: inline-block; }
+        #panel .sub { display: none; }
+        #panel header { padding-top: 10px; padding-bottom: 8px; }
+        .presets { margin-top: 6px; flex-wrap: nowrap; overflow-x: auto; }
+        .chip { white-space: nowrap; }
+        #panel footer { grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+        #panel footer .btn { padding: 4px 6px; font-size: 12px; white-space: nowrap; }
+        body.panel-min #stage { inset: 0 0 64px 0; }
+        body.panel-min #panel { height: auto; }
+        body.panel-min #panel .sub, body.panel-min #presets, body.panel-min #scroll, body.panel-min #panel footer { display: none; }
+        #viewbar .seg button { padding: 6px 8px; }
+        input[type=range] { height: 26px; }
       }
       body.still #panel, body.still #viewbar, body.still #busy { display: none; }
       body.still #stage { inset: 0; }
@@ -122,7 +138,7 @@
     </div>
     <aside id="panel">
       <header>
-        <h1>Bamboo SUP</h1>
+        <div class="titlebar"><h1>Bamboo SUP</h1><button class="btn" id="fold">Hide ▾</button></div>
         <div class="sub">Drag sliders or type a value. Every change rebuilds the board.</div>
         <div class="presets" id="presets"></div>
       </header>

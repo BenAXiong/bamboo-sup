@@ -52,6 +52,8 @@ import {
 const params = new URLSearchParams(location.search);
 const STILL = params.has("still");
 if (STILL) document.body.classList.add("still");
+// Phones get lighter meshes (fewer tube sides, simpler rattan): ?full or ?lite to force.
+const LITE = params.has("lite") || (!params.has("full") && (matchMedia("(pointer: coarse)").matches || Math.min(screen.width, screen.height) < 820));
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const DEFAULT = baseline as SupSpec;
@@ -143,7 +145,7 @@ function rebuild(): void {
     offset.remove(build.group);
     build.group.traverse((o) => (o as Mesh).geometry?.dispose());
   }
-  build = buildSup(spec, mats);
+  build = buildSup(spec, mats, { lite: LITE });
   build.group.traverse((o) => {
     const m = o as Mesh;
     if (m.isMesh) m.castShadow = m.receiveShadow = true;
@@ -615,6 +617,11 @@ function setView(id: ViewId): void {
       break;
     }
   }
+  // Narrow or portrait screens: back off so the whole board stays in frame.
+  if (id !== "lashing" && id !== "tip" && camera.aspect < 1.5) {
+    const k = Math.min(3, 1.5 / camera.aspect);
+    camera.position.sub(controls.target).multiplyScalar(k).add(controls.target);
+  }
   controls.update();
   $("cams").querySelectorAll<HTMLButtonElement>("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset["id"] === id)));
 }
@@ -673,6 +680,15 @@ function resize(): void {
   camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
+
+$("fold").onclick = () => {
+  const min = document.body.classList.toggle("panel-min");
+  $("fold").textContent = min ? "Show controls ▴" : "Hide ▾";
+  requestAnimationFrame(() => {
+    resize();
+    setView(view);
+  });
+};
 
 buildPanel();
 resize();

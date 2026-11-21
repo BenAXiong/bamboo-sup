@@ -31,8 +31,8 @@ export interface SupBuild extends RaftBuild {
   slatCount: number;
 }
 
-export function buildSup(spec: SupSpec, mats: RaftMaterials): SupBuild {
-  const raft = buildRaft(toRaftSpec(spec), mats);
+export function buildSup(spec: SupSpec, mats: RaftMaterials, opts: { lite?: boolean } = {}): SupBuild {
+  const raft = buildRaft(toRaftSpec(spec), mats, opts);
   const { group, hull } = raft;
   const rand = rng(spec.seed * 31 + 5);
   const irr = spec.natural.irregularity;
