@@ -9,7 +9,7 @@
 import { BufferAttribute, BufferGeometry, Vector3 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
-import { sweepTube, type TubePoint } from "./tube.js";
+import { LOD, sweepTube, thinIndices, type TubePoint } from "./tube.js";
 
 /** A round member a rope or lashing can wrap around. */
 export interface Member {
@@ -52,6 +52,13 @@ export function sweepRibbon(
   thick: number,
   faceNormal: (i: number) => Vector3,
 ): BufferGeometry {
+  if (LOD.k < 1 && pts.length > 12) {
+    // Phones: a fifth of the points along the strip.
+    const keep = thinIndices(pts.length, 5);
+    const fn = faceNormal;
+    pts = keep.map((i) => pts[i]!);
+    faceNormal = (i) => fn(keep[i]!);
+  }
   const N = pts.length;
   const { t } = frames(pts);
   // 4 faces x 2 verts per face edge = 8 verts per ring, for crisp edges.
@@ -250,6 +257,11 @@ export const ROPE_R = 7;
  * in a close-up.
  */
 export function laidRope(path: Vector3[], r = ROPE_R): BufferGeometry {
+  if (LOD.k < 1) {
+    // Phones: one plain tube instead of three strands.
+    const coarse = resample(path, 400);
+    return sweepTube(coarse.map((p) => ({ p, r })), { radial: 6, caps: false });
+  }
   // Resample so a lay period gets enough points.
   const pitch = r * 6.5;
   const dense = resample(path, pitch / 10);

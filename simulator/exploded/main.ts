@@ -43,6 +43,8 @@ import { cloneSpec, type RaftSpec } from "../src/scene/raftSpec.js";
 
 const params = new URLSearchParams(location.search);
 const STILL = params.has("still");
+// Phones get the light meshes (~0.44 M triangles instead of ~2.7 M): ?full or ?lite to force.
+const LITE = params.has("lite") || (!params.has("full") && (matchMedia("(pointer: coarse)").matches || Math.min(screen.width, screen.height) < 820));
 if (STILL) document.body.classList.add("still");
 
 const LABELS: Record<Assembly, { name: string; about: string }> = {
@@ -61,7 +63,7 @@ const OFFSET: Record<Assembly, number> = { keels: -1000, hull: 0, beams: 800, ra
 // ---------------------------------------------------------------- renderer + studio
 const canvas = document.getElementById("scene") as HTMLCanvasElement;
 const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: STILL });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, LITE ? 1.5 : 2));
 renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.9;
 renderer.outputColorSpace = SRGBColorSpace;
@@ -76,7 +78,7 @@ scene.add(new HemisphereLight(0xffffff, 0x8a8172, 0.6));
 const sun = new DirectionalLight(0xfff2e0, 2.4);
 sun.position.set(6, 14, 8);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(LITE ? 1024 : 2048, LITE ? 1024 : 2048);
 Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 40 });
 sun.shadow.bias = -0.0004;
 scene.add(sun);
@@ -93,7 +95,7 @@ controls.maxPolarAngle = MathUtils.degToRad(88);
 // ---------------------------------------------------------------- raft
 const spec: RaftSpec = cloneSpec(palafang as RaftSpec);
 const mats = createRaftMaterials();
-const build = buildRaft(spec, mats);
+const build = buildRaft(spec, mats, { lite: LITE });
 const raft = build.group; // design frame, mm, z up
 const holder = new Group();
 holder.add(raft);
@@ -162,7 +164,10 @@ function frame(fill = 1.0): void {
   const c = box.getCenter(new Vector3());
   const size = box.getSize(new Vector3());
   const r = Math.max(size.x, size.y, size.z) * 0.52 * fill;
-  const dist = r / Math.sin(MathUtils.degToRad(camera.fov / 2));
+  // Fit the narrower of the two fields of view (portrait phones are narrow).
+  const vHalf = MathUtils.degToRad(camera.fov / 2);
+  const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+  const dist = r / Math.sin(Math.min(vHalf, hHalf));
   const dir = new Vector3(0.55, 0.3, 1).normalize();
   camera.position.copy(c).addScaledVector(dir, dist);
   controls.target.copy(c);
@@ -266,6 +271,7 @@ function clearReplacement(a: Assembly): void {
 let gui: GUI | null = null;
 if (!STILL) {
   gui = new GUI({ title: "Exploded raft" });
+  if (window.innerWidth < 700) gui.close(); // phones: tap the title to open
   gui.add(state, "explode", 0, 1, 0.01).name("Explode").onChange((v: number) => {
     anim = null;
     for (const a of ASSEMBLIES) amount[a] = v;

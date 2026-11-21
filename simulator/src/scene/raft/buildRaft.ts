@@ -30,7 +30,7 @@ import {
 } from "./detail.js";
 import { buildHull, type CulmPath } from "./hull.js";
 import { buildSail } from "./sail.js";
-import { straight, sweepTube, type TubePoint } from "./tube.js";
+import { LOD, straight, sweepTube, type TubePoint } from "./tube.js";
 
 export type { CulmPath } from "./hull.js";
 
@@ -67,7 +67,17 @@ interface Bar {
 export const ASSEMBLIES = ["hull", "keels", "beams", "rails", "deck", "oarposts", "oars", "rig"] as const;
 export type Assembly = (typeof ASSEMBLIES)[number];
 
-export function buildRaft(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
+export function buildRaft(spec: RaftSpec, mats: RaftMaterials, opts: { lite?: boolean } = {}): RaftBuild {
+  const prevLod = LOD.k;
+  LOD.k = opts.lite ? 0.4 : 1;
+  try {
+    return buildRaftAt(spec, mats);
+  } finally {
+    LOD.k = prevLod;
+  }
+}
+
+function buildRaftAt(spec: RaftSpec, mats: RaftMaterials): RaftBuild {
   const group = new Group();
   group.name = spec.id;
   const rand = rng(spec.seed);

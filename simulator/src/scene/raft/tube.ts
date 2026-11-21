@@ -42,7 +42,32 @@ export interface TubeOptions {
   slantEnd?: { dir: Vector3; k: number };
 }
 
+/**
+ * Level of detail for everything swept from here and in detail.ts. 1 = full
+ * (renders, desktop); below 1 = lighter meshes for phones: fewer sides per
+ * tube and every other point along long paths.
+ */
+export const LOD = { k: 1 };
+
+/** Keep every `step`-th index, always including the first and last. */
+export function thinIndices(n: number, step: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < n; i += step) out.push(i);
+  if (out[out.length - 1] !== n - 1) out.push(n - 1);
+  return out;
+}
+
 export function sweepTube(points: TubePoint[], options: TubeOptions = {}): BufferGeometry {
+  if (LOD.k >= 1) return sweepTubeFull(points, options);
+  const radial = Math.max(5, Math.round((options.radial ?? 16) * LOD.k));
+  const keep = points.length > 8 ? thinIndices(points.length, 2) : points.map((_, i) => i);
+  const o: TubeOptions = { ...options, radial };
+  if (options.shape) o.shape = (i, th) => options.shape!(keep[i]!, th);
+  if (options.colorAround) o.colorAround = (i, d, p) => options.colorAround!(keep[i]!, d, p);
+  return sweepTubeFull(keep.map((i) => points[i]!), o);
+}
+
+function sweepTubeFull(points: TubePoint[], options: TubeOptions = {}): BufferGeometry {
   const radial = options.radial ?? 16;
   const caps = options.caps ?? true;
   const uOff = options.uOffset ?? 0;
