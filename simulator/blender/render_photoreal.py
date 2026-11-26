@@ -41,6 +41,7 @@ def parse_args():
     p.add_argument("--samples", type=int, default=256)
     p.add_argument("--res", default="1920x1080")
     p.add_argument("--save-blend", action="store_true")
+    p.add_argument("--mountains", action="store_true", help="sea: add a hazy green coastal range on the horizon")
     p.add_argument("--sun-az", type=float, default=None, help="put the HDRI sun at this azimuth (deg, 0 = toward +x / bow, 90 = toward +y / port)")
     return p.parse_args(argv)
 
@@ -664,6 +665,111 @@ def ocean_surface(size=400.0):
     far.data.materials.append(water)
 
 
+HAZE_MAPPINGS = []
+
+
+def coastal_range(sky, view_az_deg=-45.0, dist=2600.0, slant_deg=25.0, haze=15000.0):
+    """A green coastal range across the horizon, like the east coast seen from
+    offshore: steep forested slopes straight out of the sea, ridges fading into
+    haze with distance (camera rays see the sky through them)."""
+    import mathutils.noise as mn
+
+    va = math.radians(view_az_deg)
+    fwd = Vector((math.cos(va), math.sin(va), 0))
+    sl = math.radians(slant_deg)
+    # Coast tangent: square to the view, turned a little so it recedes to one side.
+    tan = Vector((-fwd.y, fwd.x, 0))
+    tan = (tan * math.cos(sl) + fwd * math.sin(sl)).normalized()
+    inland = Vector((-tan.y, tan.x, 0))
+    if inland.dot(fwd) < 0:
+        inland = -inland
+    origin = fwd * dist
+
+    def smooth(x, a, b):
+        t = min(1.0, max(0.0, (x - a) / (b - a)))
+        return t * t * (3 - 2 * t)
+
+    def fbm(x, y, seed, octaves=5):
+        return 0.5 + 0.5 * mn.fractal(Vector((x + seed * 17.3, y - seed * 9.1, seed * 3.7)), 0.8, 2.0, octaves)
+
+    NU, NV = 700, 220
+    U0, U1 = -7000.0, 7000.0
+    V0, V1 = -150.0, 4200.0
+    verts, cols = [], []
+    for j in range(NV + 1):
+        t = j / NV
+        s = V0 + (V1 - V0) * t ** 1.6
+        for i in range(NU + 1):
+            u = U0 + (U1 - U0) * i / NU
+            shore = 260.0 * (fbm(u / 1400.0, 0.0, 1, 3) - 0.5) * 2
+            q = s - shore
+            ridge = 1 - abs(fbm(u / 1100.0, s / 1100.0, 7, 4) * 2 - 1)
+            h = 10 + smooth(q, 40, 1500) * (180 + 560 * ridge) + 35 * fbm(u / 260.0, s / 260.0, 9, 3) * smooth(q, 20, 300)
+            if q < 0:
+                h = 12 + q * 0.4
+            p = origin + tan * u + inland * s
+            verts.append((p.x, p.y, h))
+            n = fbm(u / 70.0, s / 70.0, 12, 3)
+            g = (0.04 + 0.025 * n, 0.075 + 0.025 * n, 0.03 + 0.01 * n)
+            rock = (0.12, 0.115, 0.095)
+            k = smooth(-q, -25, 5) * 0.8  # bare rock and pebbles at the waterline
+            cols.append(tuple(g[c] * (1 - k) + rock[c] * k for c in range(3)))
+    faces = []
+    W = NU + 1
+    for j in range(NV):
+        for i in range(NU):
+            a = j * W + i
+            faces.append((a, a + 1, a + 1 + W, a + W))
+    me = bpy.data.meshes.new("CoastalRange")
+    me.from_pydata(verts, [], faces)
+    me.update()
+    ca = me.color_attributes.new("col", "FLOAT_COLOR", "POINT")
+    for k, c in enumerate(cols):
+        ca.data[k].color = (c[0], c[1], c[2], 1.0)
+    for poly in me.polygons:
+        poly.use_smooth = True
+    ob = bpy.data.objects.new("CoastalRange", me)
+    bpy.context.scene.collection.objects.link(ob)
+    ob.visible_shadow = False
+
+    m = bpy.data.materials.new("Hills")
+    N = Nodes(m)
+    out = N.new("ShaderNodeOutputMaterial")
+    b = N.new("ShaderNodeBsdfPrincipled")
+    attr = N.new("ShaderNodeAttribute", attribute_name="col")
+    N.link(attr.outputs["Color"], b.inputs["Base Color"])
+    b.inputs["Roughness"].default_value = 1.0
+    # Forest canopy has no sheen; at these grazing angles any specular turns the slopes white.
+    b.inputs["Specular IOR Level"].default_value = 0.0
+    # Aerial perspective: blend toward the sky that lies behind (the same HDRI,
+    # looked up along the view ray), more with distance.
+    cd = N.new("ShaderNodeCameraData")
+    fade = N.math("SUBTRACT", 1.0, N.math("EXPONENT", N.math("DIVIDE", N.math("MULTIPLY", cd.outputs["View Distance"], -1.0), haze)))
+    geo = N.new("ShaderNodeNewGeometry")
+    ray = N.new("ShaderNodeVectorMath", operation="SCALE")
+    N.link(geo.outputs["Incoming"], ray.inputs[0])
+    ray.inputs["Scale"].default_value = -1.0
+    mp = N.new("ShaderNodeMapping")
+    N.link(ray.outputs["Vector"], mp.inputs["Vector"])
+    HAZE_MAPPINGS.append(mp)
+    env = N.new("ShaderNodeTexEnvironment")
+    env.image = sky
+    N.link(mp.outputs["Vector"], env.inputs["Vector"])
+    wb = N.new("ShaderNodeMix", data_type="RGBA", blend_type="MULTIPLY")
+    wb.inputs["Factor"].default_value = 1.0
+    wb.inputs["B"].default_value = (1.0, 0.96, 0.9, 1.0)
+    N.link(env.outputs["Color"], wb.inputs["A"])
+    em = N.new("ShaderNodeEmission")
+    N.link(wb.outputs["Result"], em.inputs["Color"])
+    mix = N.new("ShaderNodeMixShader")
+    N.link(fade, mix.inputs["Fac"])
+    N.link(b.outputs[0], mix.inputs[1])
+    N.link(em.outputs[0], mix.inputs[2])
+    N.link(mix.outputs[0], out.inputs["Surface"])
+    me.materials.append(m)
+    return ob
+
+
 # ----------------------------------------------------------------------------- main
 
 def main():
@@ -752,6 +858,8 @@ def main():
     else:
         img = hdri_world(os.path.join(a.assets_dir, "hdri", "qwantani_afternoon_puresky_4k.hdr"), rotation_deg=0, strength=1.0)
         ocean_surface()
+        if a.mountains:
+            coastal_range(img)
     sun_dir = hdri_sun_azimuth(img)
     az0 = math.degrees(math.atan2(sun_dir.y, sun_dir.x))
     default_sun = a.sun_az if a.sun_az is not None else (95.0 if a.set == "beach" else 120.0)
@@ -759,6 +867,8 @@ def main():
 
     def set_sun(want):
         mapping.inputs["Rotation"].default_value = (0, 0, math.radians(want - az0))
+        for mp in HAZE_MAPPINGS:
+            mp.inputs["Rotation"].default_value = (0, 0, math.radians(want - az0))
         print("hdri sun az", round(az0, 1), "el", round(math.degrees(math.asin(sun_dir.z)), 1), "-> rotated to", want, flush=True)
 
     cy_ = sc.cycles
