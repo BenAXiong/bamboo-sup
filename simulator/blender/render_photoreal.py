@@ -816,9 +816,9 @@ def main():
             vs = o.data.vertices
             for k in range(0, len(vs), max(1, len(vs) // 400)):
                 bz.append((mw @ vs[k].co).z)
-        rig.location.z -= (min(bz) if bz else min(zs)) + 0.105
+        rig.location.z -= (min(bz) if bz else min(zs)) + 0.075
         # A little heel to leeward and bow-down trim under sail.
-        rig.rotation_euler = (math.radians(1.6), math.radians(0.6), rig.rotation_euler[2])
+        rig.rotation_euler = (math.radians(1.6), math.radians(1.2), rig.rotation_euler[2])
     bpy.context.view_layer.update()
 
     for m in list(bpy.data.materials):
