@@ -1,0 +1,359 @@
+{
+  "hut:Tamped earth floor": {
+    "zh": "夯實的泥土地",
+    "en": "Tamped earth floor",
+    "amis": "",
+    "note_zh": "把泥土地整平、踩實，是蓋房子的第一步。",
+    "note_en": "Earth levelled and tamped: the first step of building."
+  },
+  "hut:Wall post (hewn, flat)": {
+    "zh": "扁平木柱",
+    "en": "Hewn wall post",
+    "amis": "",
+    "note_zh": "扁平的木柱，埋進土裡約 50 公分。",
+    "note_en": "Flat hewn post, set about 50 cm into the ground."
+  },
+  "hut:Pillar (dark lumber)": {
+    "zh": "深色木柱",
+    "en": "Dark lumber pillar",
+    "amis": "",
+    "note_zh": "四個角落和兩邊長邊的中間各一根，共六根。",
+    "note_en": "One at each corner and one in the middle of each long side: six in all."
+  },
+  "hut:Ridge post (satoko), forked": {
+    "zh": "中脊柱（頂端分叉）",
+    "en": "Forked ridge post",
+    "amis": "",
+    "note_zh": "立在山牆裡，分叉的頂端托住屋脊樑。",
+    "note_en": "Stands inside the gable; its forked top cradles the ridge pole."
+  },
+  "hut:King post, forked": {
+    "zh": "短脊柱（頂端分叉）",
+    "en": "Forked king post",
+    "amis": "",
+    "note_zh": "站在橫樑上，分叉的頂端托住屋脊樑。",
+    "note_en": "Stands on a tie beam; its forked top cradles the ridge pole."
+  },
+  "hut:Tie beam": {
+    "zh": "橫樑",
+    "en": "Tie beam",
+    "amis": "",
+    "note_zh": "橫跨每一對柱子，用藤綁在柱頂。",
+    "note_en": "Spans each pair of posts, tied to the post heads with rattan."
+  },
+  "hut:Wall plate (falag)": {
+    "zh": "桁條",
+    "en": "Wall plate",
+    "amis": "",
+    "note_zh": "放在橫樑上，沿著長邊，椽子綁在上面。",
+    "note_en": "Lies on the tie beams along the long sides; the rafters are tied to it."
+  },
+  "hut:Ridge pole": {
+    "zh": "屋脊樑",
+    "en": "Ridge pole",
+    "amis": "",
+    "note_zh": "屋頂最高的那根木頭。",
+    "note_en": "The highest timber of the roof."
+  },
+  "hut:Rattan lashing": {
+    "zh": "黃藤綁結",
+    "en": "Rattan lashing",
+    "amis": "",
+    "note_zh": "每個接點都用黃藤綁，不用鐵釘。",
+    "note_en": "Every joint is tied with rattan, no nails."
+  },
+  "hut:Rattan tie": {
+    "zh": "藤綁",
+    "en": "Rattan tie",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Rattan stitch": {
+    "zh": "藤縫",
+    "en": "Rattan stitch",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Rattan band": {
+    "zh": "藤條",
+    "en": "Rattan band",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Rattan hinge ring": {
+    "zh": "藤圈門軸",
+    "en": "Rattan hinge ring",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Rafter (thorny bamboo)": {
+    "zh": "椽子（刺竹）",
+    "en": "Rafter (thorny bamboo)",
+    "amis": "",
+    "note_zh": "大約 50 公分一根，在屋脊上交叉。",
+    "note_en": "About 50 cm apart, crossing over the ridge."
+  },
+  "hut:Roof lining lath (raina, split arrow bamboo)": {
+    "zh": "竹編襯板（剖半箭竹）",
+    "en": "Roof lining lath (split arrow bamboo)",
+    "amis": "",
+    "note_zh": "箭竹剖半，三片綁成一條，橫放在椽子上。",
+    "note_en": "Arrow bamboo split in half, three halves tied into one lath, laid across the rafters."
+  },
+  "hut:Cogon thatch (白茅)": {
+    "zh": "白茅屋頂",
+    "en": "Cogon thatch",
+    "amis": "",
+    "note_zh": "白茅一束一束，從屋簷一層一層往上鋪。",
+    "note_en": "Cogon grass in bundles, laid course by course from the eaves up."
+  },
+  "hut:Thatch butts": {
+    "zh": "茅草根部",
+    "en": "Thatch butts",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Loose straw": {
+    "zh": "散出的茅草",
+    "en": "Loose straw",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Ridge roll (folded cogon)": {
+    "zh": "屋脊茅草",
+    "en": "Ridge roll (folded cogon)",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Pressing poles (silvergrass, 五節芒)": {
+    "zh": "壓條（五節芒）",
+    "en": "Pressing poles (silvergrass)",
+    "amis": "",
+    "note_zh": "五節芒的莖三支一束，壓在茅草上，用藤縫住。",
+    "note_en": "Bundles of three silvergrass stems pressed across the thatch, stitched down with rattan."
+  },
+  "hut:Outer wall: silvergrass stems (五節芒)": {
+    "zh": "外牆：五節芒莖",
+    "en": "Outer wall: silvergrass stems",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Inner wall: arrow bamboo (箭竹)": {
+    "zh": "內牆：箭竹",
+    "en": "Inner wall: arrow bamboo",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Wall core: cogon (白茅)": {
+    "zh": "牆心：白茅",
+    "en": "Wall core: cogon",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Wall rail (split bamboo)": {
+    "zh": "夾牆竹條",
+    "en": "Wall rail (split bamboo)",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Door frame (thorny bamboo, 刺竹)": {
+    "zh": "門框（刺竹）",
+    "en": "Door frame (thorny bamboo)",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Door leaf (arrow bamboo)": {
+    "zh": "門板（箭竹）",
+    "en": "Door leaf (arrow bamboo)",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Door batten": {
+    "zh": "門板橫條",
+    "en": "Door batten",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Bed leg (forked stake)": {
+    "zh": "床腳（分叉木樁）",
+    "en": "Bed leg (forked stake)",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Bed bearer (thorny bamboo)": {
+    "zh": "床架（刺竹）",
+    "en": "Bed bearer (thorny bamboo)",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Bed slats (split bamboo)": {
+    "zh": "床板（剖開的竹片）",
+    "en": "Bed slats (split bamboo)",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Hearth stone": {
+    "zh": "火塘石",
+    "en": "Hearth stone",
+    "amis": "",
+    "note_zh": "三顆石頭圍成火塘，沒有煙囪。",
+    "note_en": "Three stones make the hearth; there is no chimney."
+  },
+  "hut:Hearth ash": {
+    "zh": "灰",
+    "en": "Hearth ash",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "hut:Firewood": {
+    "zh": "柴",
+    "en": "Firewood",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:culm": {
+    "zh": "船身竹",
+    "en": "Hull culm",
+    "amis": "",
+    "note_zh": "外側的竹子最粗，每根都有自然的彎曲。",
+    "note_en": "The outer culms are the largest; every culm has its natural crooks."
+  },
+  "raft:keel": {
+    "zh": "龍骨竹",
+    "en": "Keel culm",
+    "amis": "",
+    "note_zh": "船尾兩側底下各三根，疊成三角形。",
+    "note_en": "Three culms under each side toward the stern, stacked in a triangle."
+  },
+  "raft:crossbeam": {
+    "zh": "橫木",
+    "en": "Crossbeam",
+    "amis": "",
+    "note_zh": "橫放在竹子上，每個交叉點都用藤綁。",
+    "note_en": "Laid across the culms; every crossing is tied with rattan."
+  },
+  "raft:deck-stick": {
+    "zh": "甲板邊條",
+    "en": "Deck frame stick",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:brace": {
+    "zh": "槳架撐木",
+    "en": "Oar post brace",
+    "amis": "",
+    "note_zh": "插在槳架的洞裡，用兩個藤結綁在竹子上。",
+    "note_en": "Set in a hole in the oar post and tied to the culms with two rattan knots."
+  },
+  "raft:stick": {
+    "zh": "木條",
+    "en": "Stick",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:rail": {
+    "zh": "舷竹",
+    "en": "Rail",
+    "amis": "",
+    "note_zh": "每邊一根細竹，放在橫木的末端。",
+    "note_en": "One thin culm per side, on the ends of the crossbeams."
+  },
+  "raft:deck-mat": {
+    "zh": "竹編甲板",
+    "en": "Woven deck mat",
+    "amis": "",
+    "note_zh": "剖開的竹片編成的墊子，放在橫木之間。",
+    "note_en": "Mats woven from split bamboo, laid between the crossbeams."
+  },
+  "raft:oarpost": {
+    "zh": "槳架",
+    "en": "Oar post",
+    "amis": "",
+    "note_zh": "削過的木頭，穿在舷竹上，靠著橫木。",
+    "note_en": "A hewn post threaded on the rail, against a crossbeam."
+  },
+  "raft:mast-step": {
+    "zh": "桅座",
+    "en": "Mast step",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:oar": {
+    "zh": "槳",
+    "en": "Oar",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:mast": {
+    "zh": "桅杆",
+    "en": "Mast",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:batten": {
+    "zh": "帆竹",
+    "en": "Sail batten",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:sail": {
+    "zh": "帆（樹皮編織）",
+    "en": "Sail (woven bark)",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:rope": {
+    "zh": "繩子",
+    "en": "Rope",
+    "amis": "",
+    "note_zh": "",
+    "note_en": ""
+  },
+  "raft:lashing": {
+    "zh": "藤綁",
+    "en": "Rattan lashing",
+    "amis": "",
+    "note_zh": "每個交叉點都用黃藤綁緊。",
+    "note_en": "Every crossing is tied tight with rattan."
+  },
+  "sup:tail-loop": {
+    "zh": "尾端繩圈",
+    "en": "Tail rope loop",
+    "amis": "",
+    "note_zh": "可以提板子，也可以扣腳繩。",
+    "note_en": "For carrying the board or clipping a leash."
+  },
+  "sup:deck-slats": {
+    "zh": "竹片甲板",
+    "en": "Split bamboo deck slats",
+    "amis": "",
+    "note_zh": "剖開的竹片橫放，綁在最外側的竹子上。",
+    "note_en": "Split bamboo slats laid across, tied to the outer culms."
+  }
+}

@@ -17,7 +17,7 @@
  */
 
 import { BufferAttribute, BufferGeometry, Group, IcosahedronGeometry, type Material, Mesh, Vector3 } from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries } from "../mergeTagged.js";
 
 import { fbm2, noise1, rng } from "../random.js";
 import { bundleRing, type Member, rattanLashing, rattanSeizing, sweepRibbon } from "../raft/detail.js";
@@ -140,7 +140,11 @@ export function buildHut(spec: HutSpec, mats: HutMaterials, opts: HutBuildOption
   const rr = R.rafter_diameter_mm / 2;
   const lr = R.lath_culm_diameter_mm / 2;
   const H = R.thatch_thickness_mm;
-  const wallT = spec.walls.thickness_mm;
+  // An open shelter (spec.open) has no walls, door or furniture: posts, frame and roof only.
+  const enclosed = !spec.open;
+  const wallT = enclosed ? spec.walls.thickness_mm : 0;
+  const kingPosts = spec.posts.ridge_support === "king_post";
+  const lumber = spec.posts.style === "lumber";
 
   const tieZ = Hp + tieR;
   const plateZ = Hp + 2 * tieR + plateR;
@@ -233,6 +237,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials, opts: HutBuildOption
 
   const tint = {
     post: lin(150, 132, 112),
+    lumber: lin(78, 58, 44),
     timber: lin(176, 156, 128),
     bamboo: lin(205, 188, 150),
     cane: lin(232, 210, 150),
@@ -296,29 +301,41 @@ export function buildHut(spec: HutSpec, mats: HutMaterials, opts: HutBuildOption
   // Flat hewn wall posts, set in the ground; one forked ridge post (satoko) inside each gable.
   for (const s of [-1, 1]) {
     for (const x of postXs) {
-      const lean = new Vector3(sgn() * 8, sgn() * 8, 0);
+      const lean = lumber ? new Vector3(sgn() * 3, sgn() * 3, 0) : new Vector3(sgn() * 8, sgn() * 8, 0);
       const a = new Vector3(x, s * (W / 2), -buried);
       const b = new Vector3(x, s * (W / 2), Hp).add(lean);
       // Vertical tube: section cos -> y (thickness), sin -> x (width).
       const base = postW / 2;
-      col.add("posts", "main", "post", "Wall post (hewn, flat)",
-        pole(a, b, base, base * 0.97, { radial: 24, wobble: 4, tint: tint.post, shape: rectShape(postT / postW, 1, 5) }));
+      if (lumber) {
+        // Sawn dark lumber: square edges, no taper, no wobble.
+        col.add("posts", "main", "post", "Pillar (dark lumber)",
+          pole(a, b, base, base, { radial: 28, wobble: 0, tint: tint.lumber, shape: rectShape(postT / postW, 1, 14) }));
+      } else {
+        col.add("posts", "main", "post", "Wall post (hewn, flat)",
+          pole(a, b, base, base * 0.97, { radial: 24, wobble: 4, tint: tint.post, shape: rectShape(postT / postW, 1, 5) }));
+      }
     }
   }
   const satokoX = (s: number) => s * (L / 2 - tieR - spec.posts.ridge_post_diameter_mm / 2 - 8);
   const rp = spec.posts.ridge_post_diameter_mm / 2;
   const crotchZ = ridgeZ - ridgeR - 40;
-  for (const s of [-1, 1]) {
-    const x = satokoX(s);
-    // Trunk to the fork, then two branches cradling the ridge.
-    col.add("posts", "main", "timber", "Ridge post (satoko), forked",
-      pole(new Vector3(x, 0, -buried - 100), new Vector3(x, 0, crotchZ), rp, rp * 0.82, { radial: 16, wobble: 12, tint: tint.timber }));
+  // Forked ridge posts: from the ground inside each gable (satoko), or short
+  // king posts standing on every tie beam (open shelter).
+  const ridgePostXs = kingPosts ? postXs.map((x) => x + (x < 0 ? 1 : x > 0 ? -1 : 0) * (tieR + rp * 0.2)) : [satokoX(-1), satokoX(1)];
+  const ridgePostBase = kingPosts ? Hp + 2 * tieR - 20 : -buried - 100;
+  const ridgePostLabel = kingPosts ? "King post, forked" : "Ridge post (satoko), forked";
+  const ridgePostAsm = kingPosts ? "frame" : "posts";
+  for (const x of ridgePostXs) {
+    // Trunk to the fork, then two branches cradling the ridge: one piece.
+    const parts: BufferGeometry[] = [
+      pole(new Vector3(x, 0, ridgePostBase), new Vector3(x, 0, crotchZ), rp, rp * 0.82, { radial: 16, wobble: kingPosts ? 5 : 12, tint: tint.timber }),
+    ];
     for (const side of [-1, 1]) {
       const a = new Vector3(x, side * 10, crotchZ - 140);
       const b = new Vector3(x + sgn() * 10, side * (ridgeR + 42), ridgeZ + ridgeR * 0.4);
-      col.add("posts", "main", "timber", "Ridge post (satoko), forked",
-        pole(a, b, rp * 0.55, rp * 0.4, { radial: 12, wobble: 6, tint: tint.timber }));
+      parts.push(pole(a, b, rp * 0.55, rp * 0.4, { radial: 12, wobble: 6, tint: tint.timber }));
     }
+    col.add(ridgePostAsm, "main", "timber", ridgePostLabel, mergeGeometries(parts.map(ensureAttrs))!);
   }
 
   // ================================================================== frame
@@ -361,13 +378,12 @@ export function buildHut(spec: HutSpec, mats: HutMaterials, opts: HutBuildOption
     const a = new Vector3(-xRoof - 40, 0, ridgeZ);
     const b = new Vector3(xRoof + 40, 0, ridgeZ);
     col.add("frame", "main", "timber", "Ridge pole", pole(a, b, ridgeR, ridgeR * 0.85, { radial: 16, wobble: 10, tint: tint.timber }));
-    for (const s of [-1, 1]) {
-      const x = satokoX(s);
+    for (const x of ridgePostXs) {
       col.add("frame", "main", "rattan", "Rattan lashing",
         bundleRing([{ c: new Vector3(x, 0, ridgeZ), r: ridgeR }, { c: new Vector3(x, 0, crotchZ - 60), r: rp * 0.8 }], X, 5, rand, 1.5));
-      // Gable tie beam lashed to the ridge post where they meet.
+      // Tie beam lashed to the ridge post where they meet.
       col.add("frame", "main", "rattan", "Rattan lashing",
-        rattanSeizing(member(new Vector3(x, 0, tieZ - 40), Z, rp * 0.9), 4, 0));
+        rattanSeizing(member(new Vector3(x, 0, kingPosts ? tieZ + tieR + 60 : tieZ - 40), Z, rp * 0.9), 4, 0));
     }
   }
 
@@ -787,7 +803,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials, opts: HutBuildOption
   const rails = spec.walls.rail_heights_mm;
   const plateBand = (y: number) => Math.abs(Math.abs(y) - W / 2) < plateR + 8;
   type Wall = { piece: string; along: Vector3; normal: Vector3; c0: number; c1: number; outer: number; inner: number };
-  const walls: Wall[] = [
+  const walls: Wall[] = !enclosed ? [] : [
     { piece: "front", along: X, normal: new Vector3(0, -1, 0), c0: -xOut, c1: xOut, outer: yOut, inner: yIn },
     { piece: "back", along: X, normal: new Vector3(0, 1, 0), c0: -xOut, c1: xOut, outer: yOut, inner: yIn },
     { piece: "left", along: Y, normal: new Vector3(-1, 0, 0), c0: -yIn, c1: yIn, outer: xOut, inner: xIn },
@@ -888,7 +904,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials, opts: HutBuildOption
   }
 
   // ================================================================== door
-  {
+  if (enclosed) {
     const yMid = -(yIn + yOut) / 2;
     const jx = dw / 2 + jambR;
     for (const e of [-1, 1]) {
@@ -944,7 +960,7 @@ export function buildHut(spec: HutSpec, mats: HutMaterials, opts: HutBuildOption
   }
 
   // ================================================================== interior
-  {
+  if (enclosed) {
     // Sleeping platform (kafoti'an) along the back wall.
     const hP = spec.interior.platform_height_mm;
     const depth = spec.interior.platform_depth_mm;

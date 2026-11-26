@@ -43,6 +43,8 @@ import { buildHut, HUT_ASSEMBLIES, type HutAssembly } from "../src/scene/hut/bui
 import { createHutMaterials } from "../src/scene/hut/hutMaterials.js";
 import type { HutSpec } from "../src/scene/hut/hutSpec.js";
 
+import { mountSimNav } from "../src/site/simNav.js";
+
 type Assembly = HutAssembly;
 const ASSEMBLIES = HUT_ASSEMBLIES;
 
@@ -355,3 +357,5 @@ renderer.setAnimationLoop((now) => {
   renderer.render(scene, camera);
   (window as unknown as { __frames: number }).__frames = ((window as unknown as { __frames?: number }).__frames ?? 0) + 1;
 });
+
+mountSimNav("hut");

@@ -8,8 +8,19 @@ export interface HutSpec {
   name: string;
   seed: number;
   notes?: string;
+  /** Open shelter: no walls, door or furniture (walls/door/interior values are then ignored). */
+  open?: boolean;
   plan: { length_mm: number; width_mm: number; bays: number };
-  posts: { wall_height_mm: number; section_mm: [number, number]; ridge_post_diameter_mm: number; buried_mm: number };
+  posts: {
+    wall_height_mm: number;
+    section_mm: [number, number];
+    ridge_post_diameter_mm: number;
+    buried_mm: number;
+    /** "hewn" (default): flat hewn posts. "lumber": square-edged dark sawn lumber. */
+    style?: "hewn" | "lumber";
+    /** "satoko" (default): forked posts from the ground in each gable. "king_post": short forked posts on every tie beam. */
+    ridge_support?: "satoko" | "king_post";
+  };
   frame: { plate_diameter_mm: number; tie_beam_diameter_mm: number; ridge_diameter_mm: number };
   roof: {
     ridge_height_mm: number;

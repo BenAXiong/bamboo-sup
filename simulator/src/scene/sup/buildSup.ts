@@ -11,7 +11,7 @@
  */
 
 import { BufferGeometry, Mesh, MeshStandardMaterial, Vector3 } from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries } from "../mergeTagged.js";
 
 import type { Conditions, Design } from "../../model/types.js";
 import type { RaftMaterials } from "../materials.js";

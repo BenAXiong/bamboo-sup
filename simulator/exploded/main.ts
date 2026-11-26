@@ -41,6 +41,8 @@ import { createRaftMaterials } from "../src/scene/materials.js";
 import { ASSEMBLIES, type Assembly, buildRaft } from "../src/scene/raft/buildRaft.js";
 import { cloneSpec, type RaftSpec } from "../src/scene/raftSpec.js";
 
+import { mountSimNav } from "../src/site/simNav.js";
+
 const params = new URLSearchParams(location.search);
 const STILL = params.has("still");
 // Phones get the light meshes (~0.44 M triangles instead of ~2.7 M): ?full or ?lite to force.
@@ -331,3 +333,5 @@ renderer.setAnimationLoop((now) => {
   controls.update(dt);
   renderer.render(scene, camera);
 });
+
+mountSimNav("raft");

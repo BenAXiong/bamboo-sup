@@ -11,7 +11,7 @@
  */
 
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh, Vector3 } from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries } from "../mergeTagged.js";
 
 import type { RaftMaterials } from "../materials.js";
 import type { SailSpec } from "../raftSpec.js";

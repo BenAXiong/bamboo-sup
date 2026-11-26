@@ -49,6 +49,8 @@ import {
   type SupSpec,
 } from "../src/scene/sup/supSpec.js";
 
+import { mountSimNav } from "../src/site/simNav.js";
+
 const params = new URLSearchParams(location.search);
 const STILL = params.has("still");
 if (STILL) document.body.classList.add("still");
@@ -702,3 +704,5 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 (window as unknown as { sup: unknown }).sup = { get spec() { return spec; }, get hydro() { return hydro; }, setView };
+
+mountSimNav("sup");

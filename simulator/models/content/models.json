@@ -1,0 +1,42 @@
+[
+  {
+    "id": "palafang",
+    "cat": "boats",
+    "zh": "Palafang 竹筏",
+    "en": "Palafang raft",
+    "amis": "",
+    "sub_zh": "有帆的竹筏，約 9 公尺長",
+    "sub_en": "Sailing bamboo raft, about 9 m long",
+    "ready": true
+  },
+  {
+    "id": "sup",
+    "cat": "boats",
+    "zh": "竹製立槳板",
+    "en": "Bamboo paddleboard",
+    "amis": "",
+    "sub_zh": "用竹筏的做法綁成，約 3.2 公尺長",
+    "sub_en": "Tied the raft way, about 3.2 m long",
+    "ready": true
+  },
+  {
+    "id": "amis-house",
+    "cat": "houses",
+    "zh": "阿美族茅草屋",
+    "en": "Amis thatched house",
+    "amis": "",
+    "sub_zh": "一個房間，門在長邊，約 4.2 × 3 公尺",
+    "sub_en": "One room, door on the long side, about 4.2 × 3 m",
+    "ready": true
+  },
+  {
+    "id": "ciowayan-1",
+    "cat": "houses",
+    "zh": "Ciowayan 1號",
+    "en": "Ciowayan No. 1",
+    "amis": "",
+    "sub_zh": "六根柱子的開放式茅草棚，約 5.5 × 3.5 公尺",
+    "sub_en": "Open thatched shelter on six pillars, about 5.5 × 3.5 m",
+    "ready": true
+  }
+]

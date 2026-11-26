@@ -1,0 +1,59 @@
+{
+  "id": "ciowayan-1",
+  "name": "Ciowayan 1號 (open shelter)",
+  "seed": 7,
+  "notes": "Open shelter copied from the small Amis house: no walls, 6 dark lumber pillars (corners + middle of each long side), 5 round trunks on top (2 plates + 3 tie beams), roof about half as steep, forked king posts on the tie beams carry the ridge. Sizes are Ben's estimates (2026-11-25).",
+  "plan": {
+    "length_mm": 5500,
+    "width_mm": 3500,
+    "bays": 2
+  },
+  "posts": {
+    "wall_height_mm": 2000,
+    "section_mm": [
+      200,
+      150
+    ],
+    "ridge_post_diameter_mm": 150,
+    "buried_mm": 500,
+    "style": "lumber",
+    "ridge_support": "king_post"
+  },
+  "frame": {
+    "plate_diameter_mm": 200,
+    "tie_beam_diameter_mm": 200,
+    "ridge_diameter_mm": 125
+  },
+  "roof": {
+    "ridge_height_mm": 3110,
+    "eave_overhang_mm": 550,
+    "gable_overhang_mm": 420,
+    "rafter_spacing_mm": 500,
+    "rafter_diameter_mm": 65,
+    "lath_spacing_mm": 180,
+    "lath_culm_diameter_mm": 16,
+    "thatch_thickness_mm": 250,
+    "thatch_course_mm": 220,
+    "pressing_spacing_mm": 450
+  },
+  "walls": {
+    "thickness_mm": 110,
+    "stem_diameter_mm": 15,
+    "inner_cane_diameter_mm": 14,
+    "rail_heights_mm": [
+      180,
+      820,
+      1520
+    ]
+  },
+  "door": {
+    "width_mm": 800,
+    "height_mm": 1380,
+    "open_deg": 65
+  },
+  "interior": {
+    "platform_height_mm": 450,
+    "platform_depth_mm": 1050
+  },
+  "open": true
+}

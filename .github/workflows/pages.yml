@@ -1,5 +1,5 @@
-# Publishes the phone viewer of the Amis house (site root) and the desktop
-# exploded viewer (/desktop/), the raft viewer (/raft/) and the SUP designer (/sup/) to GitHub Pages on every push to master.
+# Publishes the house phone viewer (site root), the public models site (/models/) and the experiment
+# viewers (/sim/hut/, /sim/raft/, /sim/sup/; old /desktop/, /raft/, /sup/ redirect) to GitHub Pages on every push to master.
 # One-time setup: Settings > Pages > Build and deployment > Source: GitHub Actions.
 name: Pages
 
