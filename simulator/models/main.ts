@@ -21,6 +21,7 @@ interface ModelInfo { id: ModelId; cat: "boats" | "houses"; zh: string; en: stri
 interface PartInfo { zh: string; en: string; amis: string; note_zh: string; note_en: string }
 const MODELS = modelsJson as ModelInfo[];
 const PARTS = partsJson as Record<string, PartInfo>;
+const CATS = siteJson.categories as Record<"boats" | "houses", { zh: string; en: string; amis: string }>;
 
 const params = new URLSearchParams(location.search);
 const STILL = params.has("still");
@@ -56,6 +57,8 @@ try {
 if (params.get("lang") === "en") lang = "en";
 const W = () => WORDS[lang];
 const other = (): Lang => (lang === "zh" ? "en" : "zh");
+/** Second name under the main one: in Chinese mode only the Amis name is shown; in English mode the Chinese one too. */
+const secondName = (names: { zh: string; en: string }) => (lang === "zh" ? "" : names.zh);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 // ---------------------------------------------------------------- pages
@@ -78,20 +81,21 @@ function card(href: string, pic: string, name: string, otherName: string, sub: s
 
 function renderHome(): void {
   const w = W();
-  const o = WORDS[other()];
+  const b = CATS.boats;
+  const h = CATS.houses;
   $("title").textContent = w.home;
   $("page").innerHTML = `<p class="lead">${w.homeLead}</p><div class="cards two">
-    ${card("#/boats", thumb("palafang"), w.boats, o.boats, w.boatsSub)}
-    ${card("#/houses", thumb("amis-house"), w.houses, o.houses, w.housesSub)}
+    ${card("#/boats", thumb("palafang"), b[lang], secondName(b), w.boatsSub, b.amis)}
+    ${card("#/houses", thumb("amis-house"), h[lang], secondName(h), w.housesSub, h.amis)}
   </div>`;
 }
 
 function renderCat(cat: "boats" | "houses"): void {
   const w = W();
-  $("title").textContent = cat === "boats" ? w.boats : w.houses;
+  $("title").textContent = CATS[cat][lang];
   const list = MODELS.filter((m) => m.cat === cat);
   $("page").innerHTML = `<p class="lead">${w.catLead}</p><div class="cards">
-    ${list.map((m) => card(`#/m/${m.id}`, thumb(m.id), m[lang], m[other()], lang === "zh" ? m.sub_zh : m.sub_en, m.amis)).join("")}
+    ${list.map((m) => card(`#/m/${m.id}`, thumb(m.id), m[lang], secondName(m), lang === "zh" ? m.sub_zh : m.sub_en, m.amis)).join("")}
   </div>`;
 }
 
@@ -113,6 +117,7 @@ function ensureViewer(): Viewer {
     if (p) openFocus(p);
   };
   viewer = v;
+  if (STILL) (window as unknown as { __viewer: Viewer }).__viewer = v;
   return v;
 }
 
@@ -212,7 +217,7 @@ function openFocus(p: Pick): void {
   const fallback = p.key.replace(/^\w+:/, "");
   const w = W();
   const name = part ? part[lang] : fallback;
-  const otherName = part ? part[other()] : "";
+  const otherName = part ? secondName(part) : "";
   const note = part ? (lang === "zh" ? part.note_zh : part.note_en) : "";
   $("info").innerHTML = `<h2>${esc(name)}</h2>
     ${part?.amis ? `<div class="amis">${esc(part.amis)}</div>` : ""}

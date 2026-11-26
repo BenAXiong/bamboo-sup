@@ -1,6 +1,6 @@
 /**
  * The 3D stage of the models site: one renderer, two looks (studio: plain
- * warm gradient; shore: sand, sea and sky), instant explode, slow turntable,
+ * warm gradient; shore: the raft scene's sky, sea, beach and coastal range), instant explode, slow turntable,
  * and tap-to-pick. Models come from modelBuild.ts in mm z-up and sit in a
  * y-up metre holder with their lowest point on the ground.
  */
@@ -9,26 +9,22 @@ import {
   Box3,
   CanvasTexture,
   CircleGeometry,
-  Color,
   DirectionalLight,
-  Fog,
   Group,
   HemisphereLight,
   type Material,
   MathUtils,
   Mesh,
-  MeshStandardMaterial,
   PCFShadowMap,
   PerspectiveCamera,
   Plane,
-  PlaneGeometry,
   PMREMGenerator,
   Raycaster,
-  RepeatWrapping,
   Scene,
   ShadowMaterial,
   SRGBColorSpace,
   Sphere,
+  type Texture,
   Timer,
   Vector2,
   Vector3,
@@ -37,6 +33,7 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
+import { createEnvironment, type Environment } from "../scene/environment.js";
 import { buildModel, type ModelBuild, type ModelId } from "./modelBuild.js";
 
 export interface Pick {
@@ -63,59 +60,21 @@ function gradientTexture(top: string, bottom: string, mid?: string): CanvasTextu
   return t;
 }
 
-/** Fine sand: speckles over a soft cloudy base, tiled. */
-function sandTexture(): CanvasTexture {
-  const n = 512;
-  const c = document.createElement("canvas");
-  c.width = c.height = n;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#d9c7a4";
-  g.fillRect(0, 0, n, n);
-  let s = 7;
-  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 60; i++) {
-    const x = r() * n;
-    const y = r() * n;
-    const rad = 30 + r() * 90;
-    const grd = g.createRadialGradient(x, y, 0, x, y, rad);
-    const k = r() < 0.5 ? "rgba(190,170,135,0.18)" : "rgba(235,222,196,0.2)";
-    grd.addColorStop(0, k);
-    grd.addColorStop(1, "rgba(0,0,0,0)");
-    g.fillStyle = grd;
-    for (const dx of [-n, 0, n]) for (const dy of [-n, 0, n]) {
-      g.save();
-      g.translate(dx, dy);
-      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-      g.restore();
-    }
-  }
-  for (let i = 0; i < 14000; i++) {
-    const v = r();
-    g.fillStyle = v < 0.5 ? `rgba(120,100,75,${0.15 + r() * 0.25})` : `rgba(255,250,240,${0.15 + r() * 0.3})`;
-    g.fillRect(r() * n, r() * n, 1 + r(), 1 + r());
-  }
-  const t = new CanvasTexture(c);
-  t.colorSpace = SRGBColorSpace;
-  t.wrapS = t.wrapT = RepeatWrapping;
-  t.repeat.set(60, 60);
-  t.anisotropy = 4;
-  return t;
-}
-
 export class Viewer {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
-  readonly camera = new PerspectiveCamera(38, 1, 0.05, 600);
+  readonly camera = new PerspectiveCamera(38, 1, 0.1, 30000);
   readonly controls: OrbitControls;
   private timer = new Timer();
   private sun = new DirectionalLight(0xfff2e0, 2.5);
   private hemi = new HemisphereLight(0xffffff, 0x8a8172, 0.7);
   private studio = new Group();
   private shore = new Group();
-  private sea!: Mesh;
-  private sand!: Mesh;
+  private env: Environment;
+  private studioEnv: Texture;
+  private shoreEnv: Texture | null = null;
+  private shoreFog: Scene["fog"] = null;
   private studioBg = gradientTexture("#f1ece3", "#d2c8b8");
-  private skyBg = gradientTexture("#8fb7d6", "#efe6d3", "#d8e4ea");
   private holder = new Group();
   private model: ModelBuild | null = null;
   private modelId: ModelId | null = null;
@@ -141,14 +100,13 @@ export class Viewer {
     this.renderer = r;
 
     const pmrem = new PMREMGenerator(r);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.6;
-    this.scene.add(this.hemi);
+    this.studioEnv = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.studio.add(this.hemi);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.02;
-    this.scene.add(this.sun, this.sun.target);
+    this.studio.add(this.sun, this.sun.target);
 
     // Studio: a soft shadow on an invisible floor.
     const floor = new Mesh(new CircleGeometry(40, 64), new ShadowMaterial({ opacity: 0.22 }));
@@ -156,18 +114,12 @@ export class Viewer {
     floor.receiveShadow = true;
     this.studio.add(floor);
 
-    // Shore: sand plane ending at a straight waterline, sea beyond, fog to the horizon.
-    const sandMat = new MeshStandardMaterial({ map: sandTexture(), roughness: 0.95, color: 0xffffff });
-    this.sand = new Mesh(new PlaneGeometry(500, 500), sandMat);
-    this.sand.rotation.x = -Math.PI / 2;
-    this.sand.receiveShadow = true;
-    const wet = new Mesh(new PlaneGeometry(500, 3), new MeshStandardMaterial({ color: 0xa99677, roughness: 0.35, transparent: true, opacity: 0.55 }));
-    wet.rotation.x = -Math.PI / 2;
-    wet.name = "wet";
-    this.sea = new Mesh(new PlaneGeometry(1200, 1200), new MeshStandardMaterial({ color: 0x3f7f88, roughness: 0.12, metalness: 0.05 }));
-    this.sea.rotation.x = -Math.PI / 2;
-    this.sea.position.y = -0.06;
-    this.shore.add(this.sand, wet, this.sea);
+    // Shore: the same East Coast setting as the raft scene (sky, sea, beach, coastal range).
+    this.env = createEnvironment(this.scene, r, { parent: this.shore, lite: true });
+    this.env.setWaves(0.8);
+    this.env.setSun(30, 35);
+    this.shoreEnv = this.scene.environment;
+    this.shoreFog = this.scene.fog;
     this.scene.add(this.studio, this.shore, this.holder);
 
     this.controls = new OrbitControls(this.camera, canvas);
@@ -192,22 +144,25 @@ export class Viewer {
     this.isShore = on;
     this.shore.visible = on;
     this.studio.visible = !on;
-    this.scene.background = on ? this.skyBg : this.studioBg;
-    this.scene.fog = on ? new Fog(new Color("#e3e6e2"), 60, 320) : null;
-    this.sun.color.set(on ? 0xfff0d8 : 0xfff2e0);
-    this.sun.intensity = on ? 2.9 : 2.5;
-    this.hemi.color.set(on ? 0xdfeaf5 : 0xffffff);
-    this.hemi.groundColor.set(on ? 0xbfa985 : 0x8a8172);
-    this.placeShore();
+    this.scene.background = on ? null : this.studioBg;
+    this.scene.environment = on ? this.shoreEnv : this.studioEnv;
+    this.scene.environmentIntensity = on ? 1 : 0.6;
+    // Same exposure as the raft scene for the sky setting; brighter for the plain studio.
+    this.renderer.toneMappingExposure = on ? 0.55 : 0.95;
+    this.scene.fog = on ? this.shoreFog : null;
   }
 
-  /** Waterline behind the model: right behind a boat, well back from a house. */
+  /** Put the model on the beach: a boat a few metres above the waterline, a house further up. */
   private placeShore(): void {
     const half = this.footprint();
-    const behind = this.model?.setting === "boat" ? half.z + 1.2 : half.z + 18;
-    this.sand.position.set(0, 0, 250 - behind); // far edge of the 500 m sand at z = -behind
-    const wet = this.shore.getObjectByName("wet")!;
-    wet.position.set(0, 0.004, -behind + 1.3);
+    const inland = this.model?.setting === "boat" ? half.z + 0.8 : half.z + 9;
+    this.env.setShore(-inland);
+    // Lift or sink the whole setting so the sand under the model is at y = 0.
+    this.shore.position.y = 0;
+    this.shore.updateMatrixWorld(true);
+    const hit = new Raycaster(new Vector3(0, 500, 0), new Vector3(0, -1, 0)).intersectObject(this.env.beach, false)[0];
+    this.shore.position.y = hit ? -hit.point.y : 0;
+    this.fitShadow();
   }
 
   private footprint(): Vector3 {
@@ -282,6 +237,9 @@ export class Viewer {
     this.sun.shadow.camera.updateProjectionMatrix();
     this.sun.target.position.copy(s.center);
     this.sun.position.copy(s.center).add(new Vector3(-0.45, 0.85, 0.4).multiplyScalar(r * 2 + 10));
+    const es = this.env.sun;
+    Object.assign(es.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 1, far: 200 });
+    es.shadow.camera.updateProjectionMatrix();
   }
 
   get exploded(): boolean {
@@ -331,7 +289,8 @@ export class Viewer {
   resetView(instant = false): void {
     this.target = 0;
     const setting = this.model?.setting ?? "house";
-    const dir = setting === "boat" ? new Vector3(0.75, 0.42, 0.8).normalize() : new Vector3(0.55, 0.36, 1).normalize();
+    // Low enough to see the sea and the coastal range behind the model (camera on the sea side, +z).
+    const dir = setting === "boat" ? new Vector3(0.7, 0.2, 0.85).normalize() : new Vector3(0.5, 0.2, 1).normalize();
     if (instant) {
       this.amount = 0;
       this.layout();
@@ -427,6 +386,7 @@ export class Viewer {
       this.controls.target.lerpVectors(this.fly.fromT, this.fly.toT, k);
       if (this.fly.t >= 1) this.fly = null;
     }
+    if (this.isShore) this.env.tick(dt);
     this.controls.update(dt);
     if (this.camera.position.y < 0.15) this.camera.position.y = 0.15;
     this.renderer.render(this.scene, this.camera);

@@ -16,6 +16,7 @@ import {
   MathUtils,
   Mesh,
   MeshStandardMaterial,
+  type Object3D,
   PlaneGeometry,
   PMREMGenerator,
   Scene,
@@ -32,6 +33,8 @@ import { sandMaps, waterNormals } from "./textures.js";
 
 export interface Environment {
   sun: DirectionalLight;
+  /** The beach and seabed mesh (for finding the ground height under a point). */
+  beach: Mesh;
   water: Water;
   setSun(elevationDeg: number, azimuthDeg: number): void;
   setShore(offshoreM: number): void;
@@ -39,7 +42,20 @@ export interface Environment {
   tick(dt: number): void;
 }
 
-export function createEnvironment(scene: Scene, renderer: WebGLRenderer): Environment {
+export interface EnvironmentOptions {
+  /** Where the sky, sea, beach, hills and lights go (default: the scene). Lets a viewer hide them all at once. */
+  parent?: Object3D;
+  /** Phones: smaller water reflection and coarser terrain. */
+  lite?: boolean;
+}
+
+export function createEnvironment(scene: Scene, renderer: WebGLRenderer, opts: EnvironmentOptions = {}): Environment {
+  const parent: Object3D = opts.parent ?? scene;
+  const RT = opts.lite ? 512 : 1024;
+  const BX = opts.lite ? 200 : 400;
+  const BY = opts.lite ? 150 : 300;
+  const HX = opts.lite ? 150 : 300;
+  const HY = opts.lite ? 60 : 120;
   // ---------------------------------------------------------------- sky
   const sky = new Sky();
   sky.scale.setScalar(20000);
@@ -48,7 +64,7 @@ export function createEnvironment(scene: Scene, renderer: WebGLRenderer): Enviro
   su["rayleigh"]!.value = 1.6;
   su["mieCoefficient"]!.value = 0.004;
   su["mieDirectionalG"]!.value = 0.82;
-  scene.add(sky);
+  parent.add(sky);
 
   const sun = new DirectionalLight(0xffffff, 3);
   sun.castShadow = true;
@@ -62,18 +78,18 @@ export function createEnvironment(scene: Scene, renderer: WebGLRenderer): Enviro
   sc.bottom = -14;
   sc.near = 1;
   sc.far = 120;
-  scene.add(sun, sun.target);
+  parent.add(sun, sun.target);
 
   const hemi = new HemisphereLight(0xbfd6ee, 0x6b5a44, 0.35);
-  scene.add(hemi);
+  parent.add(hemi);
 
   scene.fog = new FogExp2(0xc9d3dc, 0.0009);
 
   // ---------------------------------------------------------------- water
   const normals = waterNormals(5);
   const water = new Water(new PlaneGeometry(6000, 6000), {
-    textureWidth: 1024,
-    textureHeight: 1024,
+    textureWidth: RT,
+    textureHeight: RT,
     waterNormals: normals,
     sunDirection: new Vector3(),
     sunColor: 0xfff2dd,
@@ -85,7 +101,7 @@ export function createEnvironment(scene: Scene, renderer: WebGLRenderer): Enviro
   water.rotation.x = -Math.PI / 2;
   water.material.transparent = true;
   water.renderOrder = 1;
-  scene.add(water);
+  parent.add(water);
 
   // ---------------------------------------------------------------- beach and seabed
   const sand = sandMaps(4);
@@ -98,20 +114,20 @@ export function createEnvironment(scene: Scene, renderer: WebGLRenderer): Enviro
     bumpScale: 1.2,
     roughness: 0.95,
   });
-  const beachGeom = new PlaneGeometry(800, 600, 400, 300);
+  const beachGeom = new PlaneGeometry(800, 600, BX, BY);
   beachGeom.rotateX(-Math.PI / 2);
   const beach = new Mesh(beachGeom, terrainMat);
   beach.receiveShadow = true;
-  scene.add(beach);
+  parent.add(beach);
 
   // Coastal range: far, hazy, steep.
-  const hillsGeom = new PlaneGeometry(6000, 2400, 300, 120);
+  const hillsGeom = new PlaneGeometry(6000, 2400, HX, HY);
   hillsGeom.rotateX(-Math.PI / 2);
   const hills = new Mesh(
     hillsGeom,
     new MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: false }),
   );
-  scene.add(hills);
+  parent.add(hills);
 
   let offshore = 14;
   function shoreline(x: number): number {
@@ -233,6 +249,7 @@ export function createEnvironment(scene: Scene, renderer: WebGLRenderer): Enviro
 
   return {
     sun,
+    beach,
     water,
     setSun,
     setShore(m: number) {
@@ -240,11 +257,11 @@ export function createEnvironment(scene: Scene, renderer: WebGLRenderer): Enviro
       offshore = m;
       const p = beachGeom.getAttribute("position") as BufferAttribute;
       // Regenerate from a flat grid.
-      const flat = new PlaneGeometry(800, 600, 400, 300);
+      const flat = new PlaneGeometry(800, 600, BX, BY);
       flat.rotateX(-Math.PI / 2);
       p.copy(flat.getAttribute("position") as BufferAttribute);
       const hpos = hillsGeom.getAttribute("position") as BufferAttribute;
-      const hflat = new PlaneGeometry(6000, 2400, 300, 120);
+      const hflat = new PlaneGeometry(6000, 2400, HX, HY);
       hflat.rotateX(-Math.PI / 2);
       hpos.copy(hflat.getAttribute("position") as BufferAttribute);
       flat.dispose();

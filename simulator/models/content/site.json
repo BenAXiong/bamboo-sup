@@ -2,5 +2,17 @@
   "umami": {
     "src": "https://umami-ten-mocha.vercel.app/script.js",
     "websiteId": ""
+  },
+  "categories": {
+    "boats": {
+      "zh": "船",
+      "en": "Boats",
+      "amis": "cifar"
+    },
+    "houses": {
+      "zh": "房子",
+      "en": "Houses",
+      "amis": "taloan"
+    }
   }
 }

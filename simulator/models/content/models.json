@@ -2,7 +2,7 @@
   {
     "id": "palafang",
     "cat": "boats",
-    "zh": "Palafang 竹筏",
+    "zh": "Palafang 號",
     "en": "Palafang raft",
     "amis": "",
     "sub_zh": "有帆的竹筏，約 9 公尺長",
@@ -12,7 +12,7 @@
   {
     "id": "sup",
     "cat": "boats",
-    "zh": "竹製立槳板",
+    "zh": "竹製立槳板(SUP)",
     "en": "Bamboo paddleboard",
     "amis": "",
     "sub_zh": "用竹筏的做法綁成，約 3.2 公尺長",
