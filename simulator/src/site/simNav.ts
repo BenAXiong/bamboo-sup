@@ -1,9 +1,10 @@
 /**
  * Small top bar shared by the experiment viewers under /sim/ (hut, raft, SUP):
- * one link to each, plus the public models site. Injected by each viewer's
+ * the /sim/ landing, one link to each, plus the public models site. Injected by each viewer's
  * main.ts; the links are relative, so it works under any repo name.
  */
 const LINKS = [
+  { id: "home", label: "Sim", href: "../" },
   { id: "hut", label: "Hut", href: "../hut/" },
   { id: "raft", label: "Raft", href: "../raft/" },
   { id: "sup", label: "SUP", href: "../sup/" },

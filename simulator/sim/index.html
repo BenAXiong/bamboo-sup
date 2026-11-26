@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ciawolan sim</title>
+<link rel="icon" href="../models/icon.svg">
+<style>
+  :root { --bg: #1f1a15; --card: #2b241d; --ink: #f3ece1; --mute: #b9ab98; --line: rgba(243,236,225,0.12); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: 0.01em; }
+  p.sub { margin: 0 0 24px; color: var(--mute); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  a.card { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; color: inherit; text-decoration: none; transition: transform .15s, border-color .15s; }
+  a.card:hover { transform: translateY(-2px); border-color: rgba(243,236,225,0.3); }
+  a.card img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #3a3128; }
+  .txt { padding: 12px 14px 14px; }
+  .txt b { display: block; font-size: 16px; }
+  .txt span { color: var(--mute); font-size: 13.5px; }
+  .foot { margin-top: 22px; font-size: 14px; }
+  .foot a { color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ciawolan sim</h1>
+  <p class="sub">Experiment viewers, with every parameter exposed.</p>
+  <div class="grid">
+    <a class="card" href="hut/"><img src="../models/thumbs/amis-house.jpg" alt=""><div class="txt"><b>Hut</b><span>Amis house generator, exploded and cut views</span></div></a>
+    <a class="card" href="raft/"><img src="../models/thumbs/palafang.jpg" alt=""><div class="txt"><b>Raft</b><span>Palafang sailing raft at sea</span></div></a>
+    <a class="card" href="sup/"><img src="../models/thumbs/sup.jpg" alt=""><div class="txt"><b>SUP</b><span>Bamboo board designer with flotation readout</span></div></a>
+  </div>
+  <p class="foot"><a href="../models/">Public models site ↗</a></p>
+</main>
+</body>
+</html>
