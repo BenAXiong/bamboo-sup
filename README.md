@@ -1,23 +1,13 @@
-# Bamboo SUP
+# Ciawolan
 
-Experimental design and engineering workspace for a lightweight bamboo stand-up paddleboard built primarily from parallel bamboo culms, cross-members and lashings.
+![Palafang 號 at sea](docs/palafang-sea.jpg)
 
-The project couples **measured workshop material**, **transparent hydrostatic/stability modelling**, **interactive 3D geometry**, and **physical prototype tests**. The goal is not to reproduce a conventional SUP in bamboo: it is to find the smallest/lightest workable bamboo construction while retaining a deliberately strong recurved bow.
+Bamboo, rattan and thatch, rebuilt in 3D: the boats and houses of the Amis coast, modelled piece by piece from photographs of the real ones.
 
-## Current target
+## Models
 
-- One-person bamboo SUP.
-- Minimise finished mass and overall size without sacrificing practical standing stability.
-- Strong, visibly recurved bow, treated as both a functional and visual design variable.
-- Prefer simple bamboo + vine/rattan construction; record modern test fixtures separately.
-- Build the first simulator in the browser: TypeScript + Three.js + SVG technical views.
-- Keep physics independent from rendering.
-- Replace assumed culm geometry with measured workshop inventory as early as possible.
+Every culm, lashing, post and bundle of thatch is generated from a short written description, so each model can be taken apart, looked at part by part, and remade in another size or shape.
 
-See [`PROJECT.md`](PROJECT.md) for the initial work plan and [`DESIGN_TARGETS.md`](DESIGN_TARGETS.md) for the current constraints.
+## Simulation
 
-## Core loop
-
-**Measured reality → canonical design → prediction → prototype → measured result → model correction.**
-
-No measured workshop value should be hidden inside simulator code, and no physical prototype should lose the exact design revision from which it was built.
+The models also float: load them, change their bamboo, and see how they sit in the water. A place to try out new boats before the first culm is cut.

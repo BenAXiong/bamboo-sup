@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/BenAXiong/bamboo-sup/schema/conditions.schema.json",
+  "$id": "https://github.com/BenAXiong/ciawolan/schema/conditions.schema.json",
   "title": "Bamboo SUP load case",
   "description": "A scenario applied to a design: water, gravity, and the masses the object is asked to carry. Kept separate from design.json so a built prototype's design stays byte-stable across many test conditions. Same frame as the design it references.",
   "type": "object",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/BenAXiong/bamboo-sup/schema/design.schema.json",
+  "$id": "https://github.com/BenAXiong/ciawolan/schema/design.schema.json",
   "title": "Bamboo SUP canonical design",
   "description": "The physical object only. Rider, ballast and water belong in a conditions file. Frame: x longitudinal, 0 at tail, positive toward bow; y transverse, 0 at centreline, positive to port; z vertical, 0 at the lowest point of the unloaded assembly, positive up.",
   "type": "object",
