@@ -61,7 +61,8 @@ export function trackView(route: string, title: string): void {
   run(() =>
     window.umami!.track((p: Record<string, unknown>) => ({
       ...p,
-      url: `${location.pathname}#${route}`,
+      // Sent as a plain path (/ciawolan/models/m/palafang): Umami may drop the #hash part.
+      url: `${location.pathname.replace(/\/$/, "")}${route === "/" ? "/" : route}`,
       title,
       data: { visitor, from: from || "direct" },
     })),
