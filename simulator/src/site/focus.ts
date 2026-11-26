@@ -46,6 +46,10 @@ export class PartStage {
     const key = new DirectionalLight(0xfff2e0, 2.2);
     key.position.set(-2, 3, 2.5);
     this.scene.add(key);
+    // Rim light from behind, so the piece's outline reads against the dark glass.
+    const rim = new DirectionalLight(0xdfe8ff, 1.1);
+    rim.position.set(2.5, 1.5, -3);
+    this.scene.add(rim);
     this.scene.add(this.spin);
   }
 

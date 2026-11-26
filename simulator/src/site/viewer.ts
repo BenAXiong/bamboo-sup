@@ -1,6 +1,6 @@
 /**
- * The 3D stage of the models site: one renderer, two looks (studio: plain
- * warm gradient; shore: the raft scene's sky, sea, beach and coastal range), instant explode, slow turntable,
+ * The 3D stage of the models site: one renderer, two looks (studio: the model
+ * alone in a dark void, free to orbit all the way round, underside included; shore: the raft scene's sky, sea, beach and coastal range), instant explode, slow turntable,
  * and tap-to-pick. Models come from modelBuild.ts in mm z-up and sit in a
  * y-up metre holder with their lowest point on the ground.
  */
@@ -8,7 +8,6 @@ import {
   ACESFilmicToneMapping,
   Box3,
   CanvasTexture,
-  CircleGeometry,
   DirectionalLight,
   Group,
   HemisphereLight,
@@ -21,7 +20,6 @@ import {
   PMREMGenerator,
   Raycaster,
   Scene,
-  ShadowMaterial,
   SRGBColorSpace,
   Sphere,
   type Texture,
@@ -74,7 +72,7 @@ export class Viewer {
   private studioEnv: Texture;
   private shoreEnv: Texture | null = null;
   private shoreFog: Scene["fog"] = null;
-  private studioBg = gradientTexture("#f1ece3", "#d2c8b8");
+  private studioBg = gradientTexture("#2b2d31", "#060607", "#121315");
   private holder = new Group();
   private model: ModelBuild | null = null;
   private modelId: ModelId | null = null;
@@ -107,12 +105,7 @@ export class Viewer {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.02;
     this.studio.add(this.sun, this.sun.target);
-
-    // Studio: a soft shadow on an invisible floor.
-    const floor = new Mesh(new CircleGeometry(40, 64), new ShadowMaterial({ opacity: 0.22 }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    this.studio.add(floor);
+    // Studio: no floor at all, so the model can be seen from any side, underneath too.
 
     // Shore: the same East Coast setting as the raft scene (sky, sea, beach, coastal range).
     this.env = createEnvironment(this.scene, r, { parent: this.shore, lite: true });
@@ -150,6 +143,20 @@ export class Viewer {
     // Same exposure as the raft scene for the sky setting; brighter for the plain studio.
     this.renderer.toneMappingExposure = on ? 0.55 : 0.95;
     this.scene.fog = on ? this.shoreFog : null;
+    // On the shore the ground is real: stay above it and hide what is buried.
+    // In the studio there is no ground: orbit freely (and pan) and show every piece whole.
+    const c = this.controls;
+    c.maxPolarAngle = on ? MathUtils.degToRad(86) : Math.PI;
+    c.enablePan = !on;
+    this.layout();
+    if (on && this.model) {
+      // Back onto the shore: same side of the model, but above ground and centred again.
+      const d = this.camera.position.clone().sub(this.controls.target);
+      d.y = 0;
+      if (d.lengthSq() < 1e-6) d.set(0, 0, 1);
+      d.normalize().setY(0.25);
+      this.frameTo(true, d.normalize());
+    }
   }
 
   /** Put the model on the beach: a boat a few metres above the waterline, a house further up. */
@@ -227,7 +234,7 @@ export class Viewer {
     if (!this.model) return;
     for (const p of this.model.pieces) p.obj.position.copy(p.dir).multiplyScalar(this.amount);
     this.holder.position.y = this.lift * this.amount;
-    this.clip.constant = 0.0005;
+    this.clip.constant = this.isShore ? 0.0005 : 1e6;
   }
 
   private fitShadow(): void {
@@ -325,7 +332,8 @@ export class Viewer {
         if ((o as Mesh).isMesh && o.visible) meshes.push(o as Mesh);
       });
       for (const hit of ray.intersectObjects(meshes, false)) {
-        if (hit.point.y < -0.001 || hit.faceIndex == null) continue; // clipped underground part
+        if (hit.faceIndex == null) continue;
+        if (this.isShore && hit.point.y < -0.001) continue; // clipped underground part
         const key = this.model.keyOf(hit.object as Mesh);
         if (!key) continue;
         this.onPick({ mesh: hit.object as Mesh, faceIndex: hit.faceIndex, key });
@@ -388,7 +396,7 @@ export class Viewer {
     }
     if (this.isShore) this.env.tick(dt);
     this.controls.update(dt);
-    if (this.camera.position.y < 0.15) this.camera.position.y = 0.15;
+    if (this.isShore && this.camera.position.y < 0.15) this.camera.position.y = 0.15;
     this.renderer.render(this.scene, this.camera);
     (window as unknown as { __frames: number }).__frames = ((window as unknown as { __frames?: number }).__frames ?? 0) + 1;
   }
