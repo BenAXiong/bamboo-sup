@@ -35,6 +35,8 @@ export interface Environment {
   sun: DirectionalLight;
   /** The beach and seabed mesh (for finding the ground height under a point). */
   beach: Mesh;
+  /** The coastal range behind the beach. */
+  hills: Mesh;
   water: Water;
   setSun(elevationDeg: number, azimuthDeg: number): void;
   setShore(offshoreM: number): void;
@@ -250,6 +252,7 @@ export function createEnvironment(scene: Scene, renderer: WebGLRenderer, opts: E
   return {
     sun,
     beach,
+    hills,
     water,
     setSun,
     setShore(m: number) {

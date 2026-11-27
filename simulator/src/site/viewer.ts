@@ -129,6 +129,9 @@ export class Viewer {
     this.shoreEnv = this.scene.environment;
     this.shoreFog = this.scene.fog;
     this.scene.add(this.studio, this.shore, this.holder);
+    // Layer 1 = land the water must not mirror at sea (see placeScenery). The water's
+    // mirror camera only sees layer 0; the main camera sees both.
+    this.camera.layers.enable(1);
 
     this.controls = new OrbitControls(this.camera, canvas);
     const c = this.controls;
@@ -179,8 +182,12 @@ export class Viewer {
 
   /** Shore: a boat on the sand a little above the waterline, a house further up. Sea: a boat afloat offshore. */
   private placeScenery(): void {
-    // Open sea: rougher water, so the coast's reflection breaks up instead of mirroring.
-    this.env.setWaves(this.scenery === "sea" ? 1.8 : 0.8);
+    const sea = this.scenery === "sea";
+    // Open sea: rougher water, and the coast is left out of the reflection (its dark mirror
+    // image looked ominous); the sea then mirrors the sky. Lighter haze so the hills stay green.
+    this.env.setWaves(sea ? 1.4 : 0.8);
+    for (const m of [this.env.hills, this.env.beach]) m.layers.set(sea ? 1 : 0);
+    if (this.shoreFog && "density" in this.shoreFog) this.shoreFog.density = sea ? 0.00032 : 0.0006;
     if (this.scenery === "sea") {
       this.env.setShore(220);
       this.shore.position.y = this.waterY;
