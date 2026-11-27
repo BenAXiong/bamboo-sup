@@ -37,9 +37,9 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 // ---------------------------------------------------------------- words
 const WORDS = {
   zh: {
-    home: "竹子與茅草的模型", homeLead: "點一下，選一個來看。",
+    home: "Ciowayan 工作坊 · 3D 模型", homeLead: "點一下，選一個來看。",
     boats: "船", houses: "房子", boatsSub: "竹船、竹製立槳板", housesSub: "阿美族茅草屋、茅草棚",
-    catLead: "點一下，打開模型。", back: "返回",
+    back: "返回",
     apart: "拆開", together: "組合", spin: "轉一轉", reset: "回到原位",
     bg: "背景", loading: "載入中…", tip: "點一下零件，看名字和大小",
     scenes: { studio: "無背景", shore: "海邊", sea: "海上" }, wip: "製作中", wipNote: "這個模型還在設計中，完成後就可以看了。", ok: "好",
@@ -47,9 +47,9 @@ const WORDS = {
     about: "約", long: "長", thick: "粗", m: "公尺", cm: "公分",
   },
   en: {
-    home: "Bamboo and thatch models", homeLead: "Tap one to look at it.",
+    home: "Ciowayan workshop · 3D models", homeLead: "Tap one to look at it.",
     boats: "Boats", houses: "Houses", boatsSub: "Bamboo boat, bamboo paddleboard", housesSub: "Amis thatched house, shelter",
-    catLead: "Tap to open a model.", back: "Back",
+    back: "Back",
     apart: "Take apart", together: "Put together", spin: "Turn", reset: "Start view",
     bg: "Scenery", loading: "Loading…", tip: "Tap a part to see its name and size",
     scenes: { studio: "No scenery", shore: "Shore", sea: "At sea" }, wip: "In progress", wipNote: "This model is still being designed. You can look at it once it is ready.", ok: "OK",
@@ -94,18 +94,18 @@ function renderHome(): void {
   const w = W();
   const b = CATS.boats;
   const h = CATS.houses;
-  $("title").textContent = w.home;
+  // Keep each half whole on a narrow phone: wrap only at the middle dot.
+  $("title").innerHTML = w.home.split(" · ").map((part) => `<span style="white-space:nowrap">${esc(part)}</span>`).join(" · ");
   $("page").innerHTML = `<p class="lead">${w.homeLead}</p><div class="cards two">
-    ${card("#/boats", thumb("palafang"), b[lang], secondName(b), w.boatsSub, b.amis)}
     ${card("#/houses", thumb("amis-house"), h[lang], secondName(h), w.housesSub, h.amis)}
+    ${card("#/boats", thumb("palafang"), b[lang], secondName(b), w.boatsSub, b.amis)}
   </div>`;
 }
 
 function renderCat(cat: "boats" | "houses"): void {
-  const w = W();
   $("title").textContent = CATS[cat][lang];
   const list = MODELS.filter((m) => m.cat === cat);
-  $("page").innerHTML = `<p class="lead">${w.catLead}</p><div class="cards">
+  $("page").innerHTML = `<div class="cards">
     ${list.map((m) => card(`#/m/${m.id}`, thumb(m.id), m[lang], secondName(m), lang === "zh" ? m.sub_zh : m.sub_en, m.amis, !m.ready)).join("")}
   </div>`;
 }
