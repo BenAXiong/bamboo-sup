@@ -3,11 +3,15 @@
     "id": "palafang",
     "cat": "boats",
     "zh": "Palafang 號",
-    "en": "Palafang raft",
+    "en": "Palafang",
     "amis": "",
-    "sub_zh": "有帆的竹筏，約 9 公尺長",
-    "sub_en": "Sailing bamboo raft, about 9 m long",
-    "ready": true
+    "sub_zh": "9 公尺長的竹船。2025 年製作，航行南迴；2027 年將參加澳洲木船節。",
+    "sub_en": "A 9 m bamboo boat. Built in 2025 and sailed around the south; joining the Australian Wooden Boat Festival in 2027.",
+    "ready": true,
+    "scenes": [
+      "shore",
+      "sea"
+    ]
   },
   {
     "id": "sup",
@@ -15,9 +19,9 @@
     "zh": "竹製立槳板(SUP)",
     "en": "Bamboo paddleboard",
     "amis": "",
-    "sub_zh": "用竹筏的做法綁成，約 3.2 公尺長",
-    "sub_en": "Tied the raft way, about 3.2 m long",
-    "ready": true
+    "sub_zh": "竹筏的現代版，創新設計中。",
+    "sub_en": "A modern take on the bamboo raft, still being designed.",
+    "ready": false
   },
   {
     "id": "amis-house",
@@ -25,8 +29,8 @@
     "zh": "阿美族茅草屋",
     "en": "Amis thatched house",
     "amis": "",
-    "sub_zh": "一個房間，門在長邊，約 4.2 × 3 公尺",
-    "sub_en": "One room, door on the long side, about 4.2 × 3 m",
+    "sub_zh": "測試模型：一個房間，約 4.2 × 3 公尺。",
+    "sub_en": "Test model: one room, about 4.2 × 3 m.",
     "ready": true
   },
   {
@@ -35,8 +39,8 @@
     "zh": "Ciowayan 1號",
     "en": "Ciowayan No. 1",
     "amis": "",
-    "sub_zh": "六根柱子的開放式茅草棚，約 5.5 × 3.5 公尺",
-    "sub_en": "Open thatched shelter on six pillars, about 5.5 × 3.5 m",
+    "sub_zh": "設計中：開放式茅草棚，約 5.5 × 3.5 公尺。",
+    "sub_en": "In design: an open thatched shelter, about 5.5 × 3.5 m.",
     "ready": true
   }
 ]

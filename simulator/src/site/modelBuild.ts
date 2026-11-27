@@ -38,6 +38,8 @@ export interface ModelBuild {
   setting: Setting;
   /** Part key for a tapped mesh, or null when it should not be pickable. */
   keyOf: (m: Mesh) => string | null;
+  /** Boats: height of the waterline when afloat (mm, model frame z). */
+  waterZ?: number;
 }
 
 function hutModel(spec: HutSpec): ModelBuild {
@@ -98,7 +100,8 @@ function raftKey(m: Mesh, keys: Map<Material, string>, sup: boolean): string | n
 function raftModel(): ModelBuild {
   const mats = createRaftMaterials();
   const keys = matKeys(mats);
-  const build = buildRaft(cloneSpec(raftJson as RaftSpec), mats, { lite: true });
+  const spec = cloneSpec(raftJson as RaftSpec);
+  const build = buildRaft(spec, mats, { lite: true });
   const group = build.group;
   // Wrap each assembly's top-level children in its own group so it moves as a whole.
   const OFFSET: Record<string, number> = { keels: -1000, hull: 0, beams: 800, rails: 1500, deck: 2200, oarposts: 3000, oars: 3800, rig: 5000 };
@@ -114,7 +117,9 @@ function raftModel(): ModelBuild {
     group.add(g);
     pieces.push({ obj: g, dir: new Vector3(0, 0, OFFSET[a] ?? 0) });
   }
-  return { group, pieces, setting: "boat", keyOf: (m) => raftKey(m, keys, false) };
+  // Afloat like the raft scene: the hull culms sink by draft_fraction of their diameter.
+  const waterZ = build.keelZ + spec.scene.draft_fraction * build.centreRadius * 2;
+  return { group, pieces, setting: "boat", keyOf: (m) => raftKey(m, keys, false), waterZ };
 }
 
 function supModel(): ModelBuild {

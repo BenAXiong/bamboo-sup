@@ -233,7 +233,7 @@
   "raft:culm": {
     "zh": "船身竹",
     "en": "Hull culm",
-    "amis": "",
+    "amis": "awol",
     "note_zh": "外側的竹子最粗，每根都有自然的彎曲。",
     "note_en": "The outer culms are the largest; every culm has its natural crooks."
   },
@@ -303,7 +303,7 @@
   "raft:oar": {
     "zh": "槳",
     "en": "Oar",
-    "amis": "",
+    "amis": "sa'iwas",
     "note_zh": "",
     "note_en": ""
   },
@@ -324,7 +324,7 @@
   "raft:sail": {
     "zh": "帆（樹皮編織）",
     "en": "Sail (woven bark)",
-    "amis": "",
+    "amis": "fayang",
     "note_zh": "",
     "note_en": ""
   },

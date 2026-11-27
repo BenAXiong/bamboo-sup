@@ -1,6 +1,7 @@
 /**
- * The 3D stage of the models site: one renderer, two looks (studio: the model
- * alone in a dark void, free to orbit all the way round, underside included; shore: the raft scene's sky, sea, beach and coastal range), instant explode, slow turntable,
+ * The 3D stage of the models site: one renderer, several sceneries (studio: the model
+ * alone in a dark void, free to orbit all the way round, underside included; sea: a boat
+ * afloat off the coast; shore: the raft scene's sky, sea, beach and coastal range), instant explode, slow turntable,
  * and tap-to-pick. Models come from modelBuild.ts in mm z-up and sit in a
  * y-up metre holder with their lowest point on the ground.
  */
@@ -42,6 +43,9 @@ export interface Pick {
 
 const UP = new Vector3(0, 1, 0);
 
+/** Sceneries a model can be shown in. Add one here and in placeScenery() (e.g. a river for the SUP). */
+export type Scenery = "studio" | "shore" | "sea";
+
 function gradientTexture(top: string, bottom: string, mid?: string): CanvasTexture {
   const c = document.createElement("canvas");
   c.width = 4;
@@ -82,7 +86,12 @@ export class Viewer {
   private lift = 0;
   private fly: { from: Vector3; to: Vector3; fromT: Vector3; toT: Vector3; t: number } | null = null;
   private running = false;
-  isShore = true;
+  scenery: Scenery = "shore";
+  /** Waterline height in the holder when afloat (m). */
+  private waterY = 0;
+  get isShore(): boolean {
+    return this.scenery !== "studio";
+  }
   onUserTurn: (() => void) | null = null;
   onPick: ((p: Pick | null) => void) | null = null;
 
@@ -126,15 +135,17 @@ export class Viewer {
       this.fly = null;
       this.onUserTurn?.();
     });
-    this.setShore(true);
+    this.setScenery("shore");
     this.bindTaps();
     window.addEventListener("resize", () => this.resize());
     this.resize();
   }
 
   // ------------------------------------------------------------ looks
-  setShore(on: boolean): void {
-    this.isShore = on;
+  setScenery(s: Scenery): void {
+    const on = s !== "studio";
+    const was = this.scenery;
+    this.scenery = s;
     this.shore.visible = on;
     this.studio.visible = !on;
     this.scene.background = on ? null : this.studioBg;
@@ -149,7 +160,8 @@ export class Viewer {
     c.maxPolarAngle = on ? MathUtils.degToRad(86) : Math.PI;
     c.enablePan = !on;
     this.layout();
-    if (on && this.model) {
+    if (on && this.model) this.placeScenery();
+    if (on && this.model && was !== s) {
       // Back onto the shore: same side of the model, but above ground and centred again.
       const d = this.camera.position.clone().sub(this.controls.target);
       d.y = 0;
@@ -159,8 +171,14 @@ export class Viewer {
     }
   }
 
-  /** Put the model on the beach: a boat a few metres above the waterline, a house further up. */
-  private placeShore(): void {
+  /** Shore: a boat on the sand a little above the waterline, a house further up. Sea: a boat afloat offshore. */
+  private placeScenery(): void {
+    if (this.scenery === "sea") {
+      this.env.setShore(220);
+      this.shore.position.y = this.waterY;
+      this.fitShadow();
+      return;
+    }
     const half = this.footprint();
     const inland = this.model?.setting === "boat" ? half.z + 0.8 : half.z + 9;
     this.env.setShore(-inland);
@@ -207,6 +225,7 @@ export class Viewer {
     inner.position.x -= c.x;
     inner.position.z -= c.z;
     if (m.setting === "boat") inner.position.y -= box.min.y;
+    this.waterY = m.waterZ !== undefined ? m.waterZ * 0.001 + inner.position.y : 0;
     // How far an exploded model must rise to stay above ground.
     this.amount = 1;
     this.layout();
@@ -215,7 +234,7 @@ export class Viewer {
     this.amount = 0;
     this.layout();
     this.fitShadow();
-    this.placeShore();
+    this.placeScenery();
     this.resetView(true);
   }
 
@@ -234,7 +253,8 @@ export class Viewer {
     if (!this.model) return;
     for (const p of this.model.pieces) p.obj.position.copy(p.dir).multiplyScalar(this.amount);
     this.holder.position.y = this.lift * this.amount;
-    this.clip.constant = this.isShore ? 0.0005 : 1e6;
+    // Only the shore has a ground that hides buried ends; at sea the water covers the hull itself.
+    this.clip.constant = this.scenery === "shore" ? 0.0005 : 1e6;
   }
 
   private fitShadow(): void {
@@ -333,7 +353,7 @@ export class Viewer {
       });
       for (const hit of ray.intersectObjects(meshes, false)) {
         if (hit.faceIndex == null) continue;
-        if (this.isShore && hit.point.y < -0.001) continue; // clipped underground part
+        if (this.scenery === "shore" && hit.point.y < -0.001) continue; // clipped underground part
         const key = this.model.keyOf(hit.object as Mesh);
         if (!key) continue;
         this.onPick({ mesh: hit.object as Mesh, faceIndex: hit.faceIndex, key });
@@ -396,7 +416,8 @@ export class Viewer {
     }
     if (this.isShore) this.env.tick(dt);
     this.controls.update(dt);
-    if (this.isShore && this.camera.position.y < 0.15) this.camera.position.y = 0.15;
+    const floor = this.scenery === "sea" ? this.waterY + 0.2 : 0.15;
+    if (this.isShore && this.camera.position.y < floor) this.camera.position.y = floor;
     this.renderer.render(this.scene, this.camera);
     (window as unknown as { __frames: number }).__frames = ((window as unknown as { __frames?: number }).__frames ?? 0) + 1;
   }
