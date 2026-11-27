@@ -30,6 +30,7 @@ const MODELS = modelsJson as ModelInfo[];
 const PARTS = partsJson as Record<string, PartInfo>;
 const CATS = siteJson.categories as Record<"boats" | "houses", { zh: string; en: string; amis: string }>;
 
+declare const __BUILD_VERSION__: string;
 const params = new URLSearchParams(location.search);
 const STILL = params.has("still");
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -96,6 +97,7 @@ function renderHome(): void {
   const h = CATS.houses;
   // Keep each half whole on a narrow phone: wrap only at the middle dot.
   $("title").innerHTML = w.home.split(" · ").map((part) => `<span style="white-space:nowrap">${esc(part)}</span>`).join(" · ");
+  $("title").title = __BUILD_VERSION__;
   $("page").innerHTML = `<p class="lead">${w.homeLead}</p><div class="cards two">
     ${card("#/houses", thumb("amis-house"), h[lang], secondName(h), w.housesSub, h.amis)}
     ${card("#/boats", thumb("palafang"), b[lang], secondName(b), w.boatsSub, b.amis)}
@@ -359,6 +361,7 @@ function route(): void {
   $("lang").textContent = W().lang;
   $("back").hidden = r.name === "home";
   $("title").classList.toggle("wrap", r.name === "home");
+  if (r.name !== "home") $("title").removeAttribute("title");
   window.scrollTo(0, 0);
   if (r.name === "model") {
     $("page").hidden = true;
@@ -380,6 +383,24 @@ function route(): void {
     trackView("/", "home");
   }
   document.title = $("title").textContent ?? W().home;
+}
+
+// Version stamp (build time, Taiwan): on hover (title tooltip) or a tap on the home title.
+$("title").addEventListener("click", () => {
+  if (parse().name !== "home") return;
+  const old = document.getElementById("version");
+  if (old) return old.remove();
+  const v = document.createElement("span");
+  v.id = "version";
+  v.textContent = __BUILD_VERSION__;
+  $("title").appendChild(v);
+});
+
+// Installable app: store the site for offline use (not on a local dev server).
+if ("serviceWorker" in navigator && location.hostname !== "localhost" && !STILL) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => { /* offline support is optional */ });
+  });
 }
 
 initAnalytics(siteJson.umami);
