@@ -65,7 +65,10 @@ function gradientTexture(top: string, bottom: string, mid?: string): CanvasTextu
 export class Viewer {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
-  readonly camera = new PerspectiveCamera(38, 1, 0.1, 30000);
+  // Near/far kept tight for depth precision: with 0.1 / 30000 the water and the sea bed
+  // near the shore fought for the same pixels at low angles (flicker). The sky is drawn
+  // at the far plane whatever its value; the hills end about 3 km out.
+  readonly camera = new PerspectiveCamera(38, 1, 0.25, 6000);
   readonly controls: OrbitControls;
   private timer = new Timer();
   private sun = new DirectionalLight(0xfff2e0, 2.5);
@@ -119,6 +122,9 @@ export class Viewer {
     // Shore: the same East Coast setting as the raft scene (sky, sea, beach, coastal range).
     this.env = createEnvironment(this.scene, r, { parent: this.shore, lite: true });
     this.env.setWaves(0.8);
+    // A little more bias than the raft scene: at phone shadow resolution the culms showed acne lines.
+    this.env.sun.shadow.bias = -0.0006;
+    this.env.sun.shadow.normalBias = 0.03;
     this.env.setSun(30, 35);
     this.shoreEnv = this.scene.environment;
     this.shoreFog = this.scene.fog;
@@ -173,6 +179,8 @@ export class Viewer {
 
   /** Shore: a boat on the sand a little above the waterline, a house further up. Sea: a boat afloat offshore. */
   private placeScenery(): void {
+    // Open sea: rougher water, so the coast's reflection breaks up instead of mirroring.
+    this.env.setWaves(this.scenery === "sea" ? 1.8 : 0.8);
     if (this.scenery === "sea") {
       this.env.setShore(220);
       this.shore.position.y = this.waterY;
@@ -414,7 +422,8 @@ export class Viewer {
       this.controls.target.lerpVectors(this.fly.fromT, this.fly.toT, k);
       if (this.fly.t >= 1) this.fly = null;
     }
-    if (this.isShore) this.env.tick(dt);
+    // At sea the water runs twice as fast, so the boat seems to make way.
+    if (this.isShore) this.env.tick(this.scenery === "sea" ? dt * 2 : dt);
     this.controls.update(dt);
     const floor = this.scenery === "sea" ? this.waterY + 0.2 : 0.15;
     if (this.isShore && this.camera.position.y < floor) this.camera.position.y = floor;

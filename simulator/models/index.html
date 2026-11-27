@@ -32,8 +32,9 @@
         padding: calc(env(safe-area-inset-top, 0px) + 10px) var(--pad) 10px; pointer-events: none; }
       header > * { pointer-events: auto; }
       header h1 { flex: 1; margin: 0; font-size: 24px; font-weight: 800; line-height: 1.2; letter-spacing: 0.01em; min-width: 0;
-        overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
-        pointer-events: none; text-shadow: 0 1px 12px rgba(0,0,0,0.6); }
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 12px rgba(0,0,0,0.6); }
+      /* The home title may take two lines (it breaks only at its middle dot). */
+      header h1.wrap { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
       .round { height: 52px; min-width: 52px; padding: 0 16px; border-radius: 26px; border: 1px solid var(--line-2); background: var(--glass-btn);
         -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
         font-size: 18px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 18px rgba(0,0,0,0.35); }

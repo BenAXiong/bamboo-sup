@@ -358,6 +358,7 @@ function route(): void {
   document.documentElement.lang = lang === "zh" ? "zh-Hant" : "en";
   $("lang").textContent = W().lang;
   $("back").hidden = r.name === "home";
+  $("title").classList.toggle("wrap", r.name === "home");
   window.scrollTo(0, 0);
   if (r.name === "model") {
     $("page").hidden = true;
